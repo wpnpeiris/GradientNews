@@ -107,7 +107,7 @@ public class ScenarioGen {
 
                 @Override
                 public HostMngrComp.Init getComponentInit() {
-                    return new HostMngrComp.Init(selfAdr, ScenarioSetup.bootstrapServer, ScenarioSetup.newsOverlayId);
+                    return new HostMngrComp.Init(selfAdr, ScenarioSetup.bootstrapServer, ScenarioSetup.newsOverlayId, false);
                 }
 
                 @Override
@@ -140,7 +140,7 @@ public class ScenarioGen {
                 StochasticProcess startPeers = new StochasticProcess() {
                     {
                         eventInterArrivalTime(uniform(1000, 1100));
-                        raise(100, startNodeOp, new BasicIntSequentialDistribution(1));
+                        raise(10, startNodeOp, new BasicIntSequentialDistribution(1));
                     }
                 };
 

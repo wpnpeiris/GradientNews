@@ -17,12 +17,17 @@
  */
 package se.kth.news.core.news;
 
+import java.util.HashSet;
 import java.util.Iterator;
-import java.util.Map;
+import java.util.Set;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import se.kth.news.core.leader.LeaderSelectPort;
 import se.kth.news.core.leader.LeaderUpdate;
+import se.kth.news.core.news.data.NewsItem;
+import se.kth.news.core.news.data.NewsItemDAO;
 import se.kth.news.core.news.util.NewsView;
 import se.kth.news.play.Ping;
 import se.kth.news.play.Pong;
@@ -34,6 +39,7 @@ import se.sics.kompics.Positive;
 import se.sics.kompics.Start;
 import se.sics.kompics.network.Network;
 import se.sics.kompics.network.Transport;
+import se.sics.kompics.simulator.util.GlobalView;
 import se.sics.kompics.timer.Timer;
 import se.sics.ktoolbox.croupier.CroupierPort;
 import se.sics.ktoolbox.croupier.event.CroupierSample;
@@ -68,18 +74,22 @@ public class NewsComp extends ComponentDefinition {
     private Identifier gradientOId;
     //*******************************INTERNAL_STATE*****************************
     private NewsView localNewsView;
-
+    
+    private boolean newsFloodLeader;
+    
     public NewsComp(Init init) {
         selfAdr = init.selfAdr;
         logPrefix = "<nid:" + selfAdr.getId() + ">";
         LOG.info("{}initiating...", logPrefix);
 
         gradientOId = init.gradientOId;
+        newsFloodLeader = init.newsFloodLeader;
 
         subscribe(handleStart, control);
         subscribe(handleCroupierSample, croupierPort);
         subscribe(handleGradientSample, gradientPort);
         subscribe(handleLeader, leaderPort);
+        subscribe(handleNewsItem, networkPort);
         subscribe(handlePing, networkPort);
         subscribe(handlePong, networkPort);
     }
@@ -104,11 +114,25 @@ public class NewsComp extends ComponentDefinition {
             if (castSample.publicSample.isEmpty()) {
                 return;
             }
+
+            if(newsFloodLeader && NewsItemDAO.getInstance().isEmpty()) {
+            	LOG.info("Generate News Item...");
+            	NewsItem newsItem = new NewsItem("NEWS001", "TEST NEWS");
+            	NewsItemDAO.getInstance().add(newsItem);
+            }
+            
             Iterator<Identifier> it = castSample.publicSample.keySet().iterator();
             KAddress partner = castSample.publicSample.get(it.next()).getSource();
-            KHeader header = new BasicHeader(selfAdr, partner, Transport.UDP);
-            KContentMsg msg = new BasicContentMsg(header, new Ping());
-            trigger(msg, networkPort);
+            
+            
+            if(!NewsItemDAO.getInstance().isEmpty()) {
+            	NewsItem newsItem = NewsItemDAO.getInstance().get("NEWS001");
+            	KHeader header = new BasicHeader(selfAdr, partner, Transport.UDP);
+                KContentMsg msg = new BasicContentMsg(header, newsItem);
+                trigger(msg, networkPort);
+            }
+            
+            
         }
     };
 
@@ -124,33 +148,49 @@ public class NewsComp extends ComponentDefinition {
         }
     };
 
-    ClassMatchedHandler handlePing
-            = new ClassMatchedHandler<Ping, KContentMsg<?, ?, Ping>>() {
+    ClassMatchedHandler handleNewsItem = new ClassMatchedHandler<NewsItem, KContentMsg<?, ?, NewsItem>>() {
+    	@Override
+		public void handle(NewsItem content, KContentMsg<?, ?, NewsItem> container) {
+			LOG.info("{} received NewsItem from:{}", logPrefix, container.getHeader().getSource());
+			NewsItemDAO.getInstance().add(content);
+			
+          GlobalView gv = config().getValue("simulation.globalview", GlobalView.class);
+          Set<String> data = gv.getValue("simulation.news", HashSet.class) ;
+          data.add(selfAdr.getId().toString());
+          gv.setValue("simulation.news", data);
+          
+          
+//			trigger(container.answer(new Pong()), networkPort);
+		}
+    };
+    
+	ClassMatchedHandler handlePing = new ClassMatchedHandler<Ping, KContentMsg<?, ?, Ping>>() {
 
-                @Override
-                public void handle(Ping content, KContentMsg<?, ?, Ping> container) {
-                    LOG.info("{}received ping from:{}", logPrefix, container.getHeader().getSource());
-                    trigger(container.answer(new Pong()), networkPort);
-                }
-            };
+		@Override
+		public void handle(Ping content, KContentMsg<?, ?, Ping> container) {
+			LOG.info("{}received ping from:{}", logPrefix, container.getHeader().getSource());
+			trigger(container.answer(new Pong()), networkPort);
+		}
+	};
 
-    ClassMatchedHandler handlePong
-            = new ClassMatchedHandler<Pong, KContentMsg<?, KHeader<?>, Pong>>() {
+	ClassMatchedHandler handlePong = new ClassMatchedHandler<Pong, KContentMsg<?, KHeader<?>, Pong>>() {
 
-                @Override
-                public void handle(Pong content, KContentMsg<?, KHeader<?>, Pong> container) {
-                    LOG.info("{}received pong from:{}", logPrefix, container.getHeader().getSource());
-                }
-            };
+		@Override
+		public void handle(Pong content, KContentMsg<?, KHeader<?>, Pong> container) {
+			LOG.info("{}received pong from:{}", logPrefix, container.getHeader().getSource());
+		}
+	};
 
     public static class Init extends se.sics.kompics.Init<NewsComp> {
 
         public final KAddress selfAdr;
         public final Identifier gradientOId;
+        public final boolean newsFloodLeader;
 
-        public Init(KAddress selfAdr, Identifier gradientOId) {
+        public Init(KAddress selfAdr, Identifier gradientOId, boolean newsFloodLeader) {
             this.selfAdr = selfAdr;
             this.gradientOId = gradientOId;
+            this.newsFloodLeader = newsFloodLeader;
         }
     }
 }

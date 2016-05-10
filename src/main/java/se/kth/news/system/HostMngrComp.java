@@ -56,6 +56,7 @@ public class HostMngrComp extends ComponentDefinition {
     private KAddress selfAdr;
     private KAddress bootstrapServer;
     private Identifier overlayId;
+    private boolean newsFloodLeader;
     //***************************INTERNAL_STATE*********************************
     private Component bootstrapClientComp;
     private Component overlayMngrComp;
@@ -68,6 +69,7 @@ public class HostMngrComp extends ComponentDefinition {
 
         bootstrapServer = init.bootstrapServer;
         overlayId = init.overlayId;
+        newsFloodLeader = init.newsFloodLeader;
 
         subscribe(handleStart, control);
     }
@@ -102,7 +104,7 @@ public class HostMngrComp extends ComponentDefinition {
         AppMngrComp.ExtPort extPorts = new AppMngrComp.ExtPort(timerPort, networkPort,
                 overlayMngrComp.getPositive(CroupierPort.class), overlayMngrComp.getPositive(GradientPort.class),
                 overlayMngrComp.getNegative(OverlayViewUpdatePort.class));
-        appMngrComp = create(AppMngrComp.class, new AppMngrComp.Init(extPorts, selfAdr, overlayId));
+        appMngrComp = create(AppMngrComp.class, new AppMngrComp.Init(extPorts, selfAdr, overlayId, newsFloodLeader));
         connect(appMngrComp.getNegative(OverlayMngrPort.class), overlayMngrComp.getPositive(OverlayMngrPort.class), Channel.TWO_WAY);
     }
 
@@ -111,11 +113,13 @@ public class HostMngrComp extends ComponentDefinition {
         public final KAddress selfAdr;
         public final KAddress bootstrapServer;
         public final Identifier overlayId;
+        public final boolean newsFloodLeader;
 
-        public Init(KAddress selfAdr, KAddress bootstrapServer, Identifier overlayId) {
+        public Init(KAddress selfAdr, KAddress bootstrapServer, Identifier overlayId, boolean newsFloodLeader) {
             this.selfAdr = selfAdr;
             this.bootstrapServer = bootstrapServer;
             this.overlayId = overlayId;
+            this.newsFloodLeader = newsFloodLeader;
         }
     }
 }

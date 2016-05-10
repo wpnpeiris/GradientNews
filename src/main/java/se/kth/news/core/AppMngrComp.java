@@ -55,6 +55,7 @@ public class AppMngrComp extends ComponentDefinition {
     private ExtPort extPorts;
     private KAddress selfAdr;
     private Identifier gradientOId;
+    private boolean newsFloodLeader;
     //***************************INTERNAL_STATE*********************************
     private Component leaderSelectComp;
     private Component newsComp;
@@ -69,6 +70,7 @@ public class AppMngrComp extends ComponentDefinition {
 
         extPorts = init.extPorts;
         gradientOId = init.gradientOId;
+        newsFloodLeader = init.newsFloodLeader;
 
         subscribe(handleStart, control);
         subscribe(handleGradientConnected, omngrPort);
@@ -104,7 +106,7 @@ public class AppMngrComp extends ComponentDefinition {
     }
 
     private void connectNews() {
-        newsComp = create(NewsComp.class, new NewsComp.Init(selfAdr, gradientOId));
+        newsComp = create(NewsComp.class, new NewsComp.Init(selfAdr, gradientOId, newsFloodLeader));
         connect(newsComp.getNegative(Timer.class), extPorts.timerPort, Channel.TWO_WAY);
         connect(newsComp.getNegative(Network.class), extPorts.networkPort, Channel.TWO_WAY);
         connect(newsComp.getNegative(CroupierPort.class), extPorts.croupierPort, Channel.TWO_WAY);
@@ -118,11 +120,13 @@ public class AppMngrComp extends ComponentDefinition {
         public final ExtPort extPorts;
         public final KAddress selfAdr;
         public final Identifier gradientOId;
+        public final boolean newsFloodLeader;
 
-        public Init(ExtPort extPorts, KAddress selfAdr, Identifier gradientOId) {
+        public Init(ExtPort extPorts, KAddress selfAdr, Identifier gradientOId, boolean newsFloodLeader) {
             this.extPorts = extPorts;
             this.selfAdr = selfAdr;
             this.gradientOId = gradientOId;
+            this.newsFloodLeader = newsFloodLeader;
         }
     }
 
