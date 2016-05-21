@@ -19,7 +19,9 @@ package se.kth.news.system;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import se.kth.news.core.AppMngrComp;
+import se.kth.news.core.news.data.INewsItemDAO;
 import se.sics.kompics.Channel;
 import se.sics.kompics.Component;
 import se.sics.kompics.ComponentDefinition;
@@ -35,10 +37,8 @@ import se.sics.ktoolbox.omngr.bootstrap.BootstrapClientComp;
 import se.sics.ktoolbox.overlaymngr.OverlayMngrComp;
 import se.sics.ktoolbox.overlaymngr.OverlayMngrPort;
 import se.sics.ktoolbox.util.identifiable.Identifier;
-import se.sics.ktoolbox.util.identifiable.basic.OverlayIdFactory;
 import se.sics.ktoolbox.util.network.KAddress;
 import se.sics.ktoolbox.util.network.nat.NatAwareAddress;
-import se.sics.ktoolbox.util.overlays.view.OverlayViewUpdate;
 import se.sics.ktoolbox.util.overlays.view.OverlayViewUpdatePort;
 
 /**
@@ -56,7 +56,7 @@ public class HostMngrComp extends ComponentDefinition {
     private KAddress selfAdr;
     private KAddress bootstrapServer;
     private Identifier overlayId;
-    private boolean newsFloodLeader;
+    private INewsItemDAO newItemDAO;
     //***************************INTERNAL_STATE*********************************
     private Component bootstrapClientComp;
     private Component overlayMngrComp;
@@ -69,7 +69,7 @@ public class HostMngrComp extends ComponentDefinition {
 
         bootstrapServer = init.bootstrapServer;
         overlayId = init.overlayId;
-        newsFloodLeader = init.newsFloodLeader;
+        newItemDAO = init.newItemDAO;
 
         subscribe(handleStart, control);
     }
@@ -104,7 +104,7 @@ public class HostMngrComp extends ComponentDefinition {
         AppMngrComp.ExtPort extPorts = new AppMngrComp.ExtPort(timerPort, networkPort,
                 overlayMngrComp.getPositive(CroupierPort.class), overlayMngrComp.getPositive(GradientPort.class),
                 overlayMngrComp.getNegative(OverlayViewUpdatePort.class));
-        appMngrComp = create(AppMngrComp.class, new AppMngrComp.Init(extPorts, selfAdr, overlayId, newsFloodLeader));
+        appMngrComp = create(AppMngrComp.class, new AppMngrComp.Init(extPorts, selfAdr, overlayId, newItemDAO));
         connect(appMngrComp.getNegative(OverlayMngrPort.class), overlayMngrComp.getPositive(OverlayMngrPort.class), Channel.TWO_WAY);
     }
 
@@ -113,13 +113,13 @@ public class HostMngrComp extends ComponentDefinition {
         public final KAddress selfAdr;
         public final KAddress bootstrapServer;
         public final Identifier overlayId;
-        public final boolean newsFloodLeader;
+        public final INewsItemDAO newItemDAO;
 
-        public Init(KAddress selfAdr, KAddress bootstrapServer, Identifier overlayId, boolean newsFloodLeader) {
+        public Init(KAddress selfAdr, KAddress bootstrapServer, Identifier overlayId, INewsItemDAO newItemDAO) {
             this.selfAdr = selfAdr;
             this.bootstrapServer = bootstrapServer;
             this.overlayId = overlayId;
-            this.newsFloodLeader = newsFloodLeader;
+            this.newItemDAO = newItemDAO;
         }
     }
 }

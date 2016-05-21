@@ -15,13 +15,15 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  */
-package se.kth.news.sim;
+package se.kth.news.sim.task2;
 
 import java.util.HashMap;
 import java.util.Map;
 
+import se.kth.news.core.news.data.INewsItemDAO;
+import se.kth.news.core.news.data.NewsItem;
+import se.kth.news.sim.ScenarioSetup;
 import se.kth.news.sim.compatibility.SimNodeIdExtractor;
-import se.kth.news.sim.data.NewsItemSimulationDAO;
 import se.kth.news.system.HostMngrComp;
 import se.sics.kompics.network.Address;
 import se.sics.kompics.simulator.SimulationScenario;
@@ -31,6 +33,7 @@ import se.sics.kompics.simulator.adaptor.distributions.extra.BasicIntSequentialD
 import se.sics.kompics.simulator.events.system.SetupEvent;
 import se.sics.kompics.simulator.events.system.StartNodeEvent;
 import se.sics.kompics.simulator.network.identifier.IdentifierExtractor;
+import se.sics.kompics.simulator.run.LauncherComp;
 import se.sics.ktoolbox.omngr.bootstrap.BootstrapServerComp;
 import se.sics.ktoolbox.util.network.KAddress;
 import se.sics.ktoolbox.util.overlays.id.OverlayIdRegistry;
@@ -38,7 +41,7 @@ import se.sics.ktoolbox.util.overlays.id.OverlayIdRegistry;
 /**
  * @author Alex Ormenisan <aaor@kth.se>
  */
-public class ScenarioGen {
+public class LeaderSelectionScenario {
 
     static Operation<SetupEvent> systemSetupOp = new Operation<SetupEvent>() {
         @Override
@@ -109,7 +112,24 @@ public class ScenarioGen {
 
                 @Override
                 public HostMngrComp.Init getComponentInit() {
-                    return new HostMngrComp.Init(selfAdr, ScenarioSetup.bootstrapServer, ScenarioSetup.newsOverlayId, new NewsItemSimulationDAO());
+                    return new HostMngrComp.Init(selfAdr, ScenarioSetup.bootstrapServer, ScenarioSetup.newsOverlayId, new INewsItemDAO() {
+                    	public void add(NewsItem newsItem) {
+                    	}
+
+                    	public NewsItem get(String id) {
+                    		return new NewsItem(id, "");
+                    	}
+
+                    	public boolean isEmpty() {
+                    		return false;
+                    	}
+                    	
+                    	public int getCount() {
+//                    		Assume number of news items varies according to node id
+//                    		i.e. node 1 has 10 news items, node 22 has 220 items, etc
+                    		return Integer.valueOf(selfAdr.getId().toString()) * 10;
+                    	}
+                    });
                 }
 
                 @Override
@@ -124,7 +144,7 @@ public class ScenarioGen {
         }
     };
 
-    public static SimulationScenario simpleBoot() {
+    public static SimulationScenario scenario1() {
         SimulationScenario scen = new SimulationScenario() {
             {
                 StochasticProcess systemSetup = new StochasticProcess() {
@@ -142,7 +162,7 @@ public class ScenarioGen {
                 StochasticProcess startPeers = new StochasticProcess() {
                     {
                         eventInterArrivalTime(uniform(1000, 1100));
-                        raise(30, startNodeOp, new BasicIntSequentialDistribution(1));
+                        raise(100, startNodeOp, new BasicIntSequentialDistribution(1));
                     }
                 };
 
@@ -154,5 +174,11 @@ public class ScenarioGen {
         };
 
         return scen;
+    }
+    
+    public static void main(String[] args) {
+        SimulationScenario.setSeed(ScenarioSetup.scenarioSeed);
+        SimulationScenario simpleBootScenario = LeaderSelectionScenario.scenario1();
+        simpleBootScenario.simulate(LauncherComp.class);
     }
 }

@@ -9,14 +9,14 @@ package se.kth.news.core.news.data;
  */
 public class NewsItem {
 	private String id;
-	
+
 	private String news;
 
 	public NewsItem(String id, String news) {
 		this.id = id;
 		this.news = news;
 	}
-	
+
 	public String getId() {
 		return id;
 	}
@@ -32,5 +32,4 @@ public class NewsItem {
 	public void setNews(String news) {
 		this.news = news;
 	}
-
 }
