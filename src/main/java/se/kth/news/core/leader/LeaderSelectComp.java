@@ -73,6 +73,8 @@ public class LeaderSelectComp extends ComponentDefinition {
     private NewsView localNewsView;
     private Set<ElectionAck> acks = new HashSet<ElectionAck>();
     
+    private KAddress leaderSelected;
+    
     public LeaderSelectComp(Init init) {
         selfAdr = init.selfAdr;
         logPrefix = "<nid:" + selfAdr.getId() + ">";
@@ -85,7 +87,8 @@ public class LeaderSelectComp extends ComponentDefinition {
         subscribe(handleStart, control);
         subscribe(handleGradientSample, gradientPort);
         subscribe(handleElection, networkPort);
-        subscribe(handleLeaderAck, networkPort);
+        subscribe(handleElectionAck, networkPort);
+        subscribe(handleLeaderUpdate, networkPort);
         subscribe(timeoutHandler, timerPort);
     }
 
@@ -125,13 +128,30 @@ public class LeaderSelectComp extends ComponentDefinition {
             		spt.setTimeoutEvent(timeout);
     				trigger(spt, timerPort);
         		}
-        	}       	
+        	}   
+        	
+        	
+//        	Disseminate Leader information
+        	if(leaderSelected != null) {
+//        		LOG.info("{} Dissiminate LeaderUpdate from:{} ", logPrefix, selfAdr);
+        		for(Object obj: sample.gradientFingers) {
+        			Container<KAddress, NewsView> neighbour = (Container<KAddress, NewsView>) obj;
+        			KAddress neighbourAddr = neighbour.getSource();
+        			KHeader header = new BasicHeader(selfAdr, neighbourAddr, Transport.UDP);
+            		KContentMsg msg = new BasicContentMsg(header, new LeaderUpdate(leaderSelected));
+            		trigger(msg, networkPort);
+        		}
+        	} 
         }
     };
 
     Handler<ElectionTimeout> timeoutHandler = new Handler<ElectionTimeout>() {
 		public void handle(ElectionTimeout event) {
-			System.out.println("Election Ack Timeout at >>>>>>>>>>>>>> " + selfAdr.getId() + " , ak size: " + acks.size());
+			if(acks.size() == 0) {
+				LOG.info("{} Leader is selected as:{} ", logPrefix, selfAdr);
+				leaderSelected = selfAdr;
+	            trigger(new LeaderUpdate(selfAdr), leaderUpdate);
+			}
 		}
 	};
 	
@@ -153,12 +173,24 @@ public class LeaderSelectComp extends ComponentDefinition {
         }
     };
     
-    ClassMatchedHandler handleLeaderAck = new ClassMatchedHandler<ElectionAck, KContentMsg<?, ?, ElectionAck>>() {
+    ClassMatchedHandler handleElectionAck = new ClassMatchedHandler<ElectionAck, KContentMsg<?, ?, ElectionAck>>() {
 
         @Override
         public void handle(ElectionAck content, KContentMsg<?, ?, ElectionAck> container) {
             LOG.info("{} received LeaderAck at:{} from:{}", logPrefix, selfAdr, container.getHeader().getSource());
             acks.add(content);
+        }
+    };
+    
+    ClassMatchedHandler handleLeaderUpdate = new ClassMatchedHandler<LeaderUpdate, KContentMsg<?, ?, LeaderUpdate>>() {
+
+        @Override
+        public void handle(LeaderUpdate content, KContentMsg<?, ?, LeaderUpdate> container) {
+            if(leaderSelected == null) {
+            	LOG.info("{} XXXX received LeaderUpdate at:{} from:{}", logPrefix, selfAdr, container.getHeader().getSource());
+            	leaderSelected = content.leaderAdr;
+            	trigger(new LeaderUpdate(content.leaderAdr), leaderUpdate);
+            }
         }
     };
     

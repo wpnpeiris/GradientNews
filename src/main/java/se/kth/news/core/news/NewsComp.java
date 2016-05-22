@@ -67,6 +67,8 @@ public class NewsComp extends ComponentDefinition {
     Positive<LeaderSelectPort> leaderPort = requires(LeaderSelectPort.class);
     Negative<OverlayViewUpdatePort> viewUpdatePort = provides(OverlayViewUpdatePort.class);
     //*******************************EXTERNAL_STATE*****************************
+    private KAddress leader;
+
     private KAddress selfAdr;
     private Identifier gradientOId;
     private INewsItemDAO newItemDAO;
@@ -114,13 +116,15 @@ public class NewsComp extends ComponentDefinition {
 
     Handler handleGradientSample = new Handler<TGradientSample>() {
         @Override
-        public void handle(TGradientSample sample) {   	
+        public void handle(TGradientSample sample) {   
         }
     };
     
     Handler handleLeader = new Handler<LeaderUpdate>() {
         @Override
         public void handle(LeaderUpdate event) {
+        	LOG.info("{} Update Leader as :{} ", logPrefix, event.leaderAdr.getId());
+        	leader = event.leaderAdr;
         }
     };
 
