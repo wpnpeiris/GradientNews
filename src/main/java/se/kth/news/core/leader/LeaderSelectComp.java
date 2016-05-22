@@ -18,18 +18,33 @@
 package se.kth.news.core.leader;
 
 import java.util.Comparator;
+import java.util.HashSet;
+import java.util.Set;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import se.kth.news.core.news.data.INewsItemDAO;
+import se.kth.news.core.news.util.NewsView;
+import se.sics.kompics.ClassMatchedHandler;
 import se.sics.kompics.ComponentDefinition;
 import se.sics.kompics.Handler;
 import se.sics.kompics.Negative;
 import se.sics.kompics.Positive;
 import se.sics.kompics.Start;
 import se.sics.kompics.network.Network;
+import se.sics.kompics.network.Transport;
+import se.sics.kompics.timer.ScheduleTimeout;
+import se.sics.kompics.timer.Timeout;
 import se.sics.kompics.timer.Timer;
 import se.sics.ktoolbox.gradient.GradientPort;
 import se.sics.ktoolbox.gradient.event.TGradientSample;
 import se.sics.ktoolbox.util.network.KAddress;
+import se.sics.ktoolbox.util.network.KContentMsg;
+import se.sics.ktoolbox.util.network.KHeader;
+import se.sics.ktoolbox.util.network.basic.BasicContentMsg;
+import se.sics.ktoolbox.util.network.basic.BasicHeader;
+import se.sics.ktoolbox.util.other.Container;
 
 /**
  * @author Alex Ormenisan <aaor@kth.se>
@@ -38,7 +53,7 @@ public class LeaderSelectComp extends ComponentDefinition {
 
     private static final Logger LOG = LoggerFactory.getLogger(LeaderSelectComp.class);
     private String logPrefix = " ";
-
+    
     //*******************************CONNECTIONS********************************
     Positive<Timer> timerPort = requires(Timer.class);
     Positive<Network> networkPort = requires(Network.class);
@@ -48,18 +63,36 @@ public class LeaderSelectComp extends ComponentDefinition {
     private KAddress selfAdr;
     //*******************************INTERNAL_STATE*****************************
     private Comparator viewComparator;
-
+    
+    private final int GRADIENT_STABLE_ROUND = 10;
+    private int currentRound = 0;
+    private boolean gradientNotStablized = true;
+    
+    
+    private INewsItemDAO newItemDAO;
+    private NewsView localNewsView;
+    private Set<ElectionAck> acks = new HashSet<ElectionAck>();
+    
     public LeaderSelectComp(Init init) {
         selfAdr = init.selfAdr;
         logPrefix = "<nid:" + selfAdr.getId() + ">";
         LOG.info("{}initiating...", logPrefix);
         
         viewComparator = viewComparator;
+        newItemDAO = init.newItemDAO;
+        updateLocalNewsView();
 
         subscribe(handleStart, control);
         subscribe(handleGradientSample, gradientPort);
+        subscribe(handleElection, networkPort);
+        subscribe(handleLeaderAck, networkPort);
+        subscribe(timeoutHandler, timerPort);
     }
 
+    private void updateLocalNewsView() {
+    	int newsCount = newItemDAO.getCount();
+        localNewsView = new NewsView(selfAdr.getId(), newsCount);
+    }
     Handler handleStart = new Handler<Start>() {
         @Override
         public void handle(Start event) {
@@ -70,20 +103,81 @@ public class LeaderSelectComp extends ComponentDefinition {
     Handler handleGradientSample = new Handler<TGradientSample>() {
         @Override
         public void handle(TGradientSample sample) {
-            LOG.debug("{}neighbours:{}", logPrefix, sample.gradientNeighbours);
-            LOG.debug("{}fingers:{}", logPrefix, sample.gradientFingers);
-            LOG.debug("{}local view:{}", logPrefix, sample.selfView);
+        	if(gradientNotStablized && GRADIENT_STABLE_ROUND == (currentRound++) ){
+        		LOG.info("{} Gradient stablized for node: " + selfAdr.getId(), logPrefix);
+        		gradientNotStablized = false;
+        		
+        		Container<KAddress, NewsView> highUtilNeighbour = getHighUtilNeighbour(sample);
+        		int neighbourUtilVal = highUtilNeighbour.getContent().localNewsCount;
+        		if(localNewsView.localNewsCount >= neighbourUtilVal) {
+            		LOG.info("{} Node: " + selfAdr.getId() +  " is eligable for leader", logPrefix);
+            		
+            		for(Object obj: sample.getGradientNeighbours()) {
+            			Container<KAddress, NewsView> neighbour = (Container<KAddress, NewsView>) obj;
+            			KAddress neighbourAddr = neighbour.getSource();
+        				KHeader header = new BasicHeader(selfAdr, neighbourAddr, Transport.UDP);
+                		KContentMsg msg = new BasicContentMsg(header, new Election(localNewsView.localNewsCount));
+                		trigger(msg, networkPort);
+            		}
+            		
+            		ScheduleTimeout spt = new ScheduleTimeout(5000);
+            		ElectionTimeout timeout = new ElectionTimeout(spt);
+            		spt.setTimeoutEvent(timeout);
+    				trigger(spt, timerPort);
+        		}
+        	}       	
         }
     };
 
+    Handler<ElectionTimeout> timeoutHandler = new Handler<ElectionTimeout>() {
+		public void handle(ElectionTimeout event) {
+			System.out.println("Election Ack Timeout at >>>>>>>>>>>>>> " + selfAdr.getId() + " , ak size: " + acks.size());
+		}
+	};
+	
+    private Container<KAddress, NewsView> getHighUtilNeighbour(TGradientSample sample) {
+    	return (Container<KAddress, NewsView>) sample.gradientNeighbours.get(sample.gradientNeighbours.size() - 1);
+    }
+    
+    ClassMatchedHandler handleElection = new ClassMatchedHandler<Election, KContentMsg<?, ?, Election>>() {
+
+        @Override
+        public void handle(Election content, KContentMsg<?, ?, Election> container) {
+            LOG.info("{} received Election message at:{} from:{}", logPrefix, selfAdr, container.getHeader().getSource());
+            if(Integer.valueOf(selfAdr.getId().toString()) >= Integer.valueOf(container.getHeader().getSource().getId().toString())){
+	            System.out.println(localNewsView.localNewsCount + " vs " + content.getUtility());	
+	            if(localNewsView.localNewsCount >= content.getUtility()) {
+	            		trigger(container.answer(new ElectionAck()), networkPort);		
+	            } 
+            } 
+        }
+    };
+    
+    ClassMatchedHandler handleLeaderAck = new ClassMatchedHandler<ElectionAck, KContentMsg<?, ?, ElectionAck>>() {
+
+        @Override
+        public void handle(ElectionAck content, KContentMsg<?, ?, ElectionAck> container) {
+            LOG.info("{} received LeaderAck at:{} from:{}", logPrefix, selfAdr, container.getHeader().getSource());
+            acks.add(content);
+        }
+    };
+    
     public static class Init extends se.sics.kompics.Init<LeaderSelectComp> {
 
         public final KAddress selfAdr;
         public final Comparator viewComparator;
+        public final INewsItemDAO newItemDAO;
 
-        public Init(KAddress selfAdr, Comparator viewComparator) {
+        public Init(KAddress selfAdr, Comparator viewComparator, INewsItemDAO newItemDAO) {
             this.selfAdr = selfAdr;
             this.viewComparator = viewComparator;
+            this.newItemDAO = newItemDAO;
         }
     }
+    
+    public static class ElectionTimeout extends Timeout {
+		public ElectionTimeout(ScheduleTimeout spt) {
+			super(spt);
+		}
+	}
 }

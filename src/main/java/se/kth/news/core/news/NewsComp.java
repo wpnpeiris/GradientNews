@@ -17,17 +17,16 @@
  */
 package se.kth.news.core.news;
 
-import java.util.Iterator;
-import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import se.kth.news.core.leader.Election;
 import se.kth.news.core.leader.LeaderSelectPort;
 import se.kth.news.core.leader.LeaderUpdate;
 import se.kth.news.core.news.data.INewsItemDAO;
 import se.kth.news.core.news.util.NewsView;
 import se.kth.news.play.Ping;
 import se.kth.news.play.Pong;
-import se.kth.news.sim.data.NewsItemSimulationDAO;
 import se.sics.kompics.ClassMatchedHandler;
 import se.sics.kompics.ComponentDefinition;
 import se.sics.kompics.Handler;
@@ -47,6 +46,7 @@ import se.sics.ktoolbox.util.network.KContentMsg;
 import se.sics.ktoolbox.util.network.KHeader;
 import se.sics.ktoolbox.util.network.basic.BasicContentMsg;
 import se.sics.ktoolbox.util.network.basic.BasicHeader;
+import se.sics.ktoolbox.util.other.Container;
 import se.sics.ktoolbox.util.overlays.view.OverlayViewUpdate;
 import se.sics.ktoolbox.util.overlays.view.OverlayViewUpdatePort;
 
@@ -58,6 +58,7 @@ public class NewsComp extends ComponentDefinition {
     private static final Logger LOG = LoggerFactory.getLogger(NewsComp.class);
     private String logPrefix = " ";
 
+    
     //*******************************CONNECTIONS********************************
     Positive<Timer> timerPort = requires(Timer.class);
     Positive<Network> networkPort = requires(Network.class);
@@ -69,6 +70,7 @@ public class NewsComp extends ComponentDefinition {
     private KAddress selfAdr;
     private Identifier gradientOId;
     private INewsItemDAO newItemDAO;
+    private int x = 0;
     //*******************************INTERNAL_STATE*****************************
     private NewsView localNewsView;
 
@@ -107,26 +109,15 @@ public class NewsComp extends ComponentDefinition {
     Handler handleCroupierSample = new Handler<CroupierSample<NewsView>>() {
         @Override
         public void handle(CroupierSample<NewsView> castSample) {
-//            if (castSample.publicSample.isEmpty()) {
-//                return;
-//            }
-//            Iterator<Identifier> it = castSample.publicSample.keySet().iterator();
-//            KAddress partner = castSample.publicSample.get(it.next()).getSource();
-//            KHeader header = new BasicHeader(selfAdr, partner, Transport.UDP);
-//            KContentMsg msg = new BasicContentMsg(header, new Ping());
-//            trigger(msg, networkPort);
         }
     };
 
     Handler handleGradientSample = new Handler<TGradientSample>() {
         @Override
-        public void handle(TGradientSample sample) {
-        	System.out.println(">>> TGradientSample.gradientNeighbours: " + sample.gradientNeighbours);
-        	System.out.println(">>> TGradientSample.gradientFingers: " + sample.gradientFingers);
-        	System.out.println(">>> TGradientSample.selfView: " + sample.selfView);
+        public void handle(TGradientSample sample) {   	
         }
     };
-
+    
     Handler handleLeader = new Handler<LeaderUpdate>() {
         @Override
         public void handle(LeaderUpdate event) {

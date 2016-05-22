@@ -19,6 +19,7 @@ package se.kth.news.sim.task2;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Random;
 
 import se.kth.news.core.news.data.INewsItemDAO;
 import se.kth.news.core.news.data.NewsItem;
@@ -28,7 +29,8 @@ import se.kth.news.system.HostMngrComp;
 import se.sics.kompics.network.Address;
 import se.sics.kompics.simulator.SimulationScenario;
 import se.sics.kompics.simulator.adaptor.Operation;
-import se.sics.kompics.simulator.adaptor.Operation1;
+import se.sics.kompics.simulator.adaptor.Operation2;
+import se.sics.kompics.simulator.adaptor.distributions.IntegerUniformDistribution;
 import se.sics.kompics.simulator.adaptor.distributions.extra.BasicIntSequentialDistribution;
 import se.sics.kompics.simulator.events.system.SetupEvent;
 import se.sics.kompics.simulator.events.system.StartNodeEvent;
@@ -89,10 +91,10 @@ public class LeaderSelectionScenario {
         }
     };
 
-    static Operation1<StartNodeEvent, Integer> startNodeOp = new Operation1<StartNodeEvent, Integer>() {
+    static Operation2<StartNodeEvent, Integer, Integer> startNodeOp = new Operation2<StartNodeEvent, Integer, Integer>() {
 
         @Override
-        public StartNodeEvent generate(final Integer nodeId) {
+        public StartNodeEvent generate(final Integer nodeId, final Integer numNews) {
             return new StartNodeEvent() {
                 KAddress selfAdr;
 
@@ -126,8 +128,16 @@ public class LeaderSelectionScenario {
                     	
                     	public int getCount() {
 //                    		Assume number of news items varies according to node id
-//                    		i.e. node 1 has 10 news items, node 22 has 220 items, etc
-                    		return Integer.valueOf(selfAdr.getId().toString()) * 10;
+//                    		i.e. node 12 has 10 news items, node 22 has 20 items, etc
+//                    		System.out.println(">>>> " + numNews);
+                    		int count = 0;
+                    		if(Integer.valueOf(selfAdr.getId().toString()) < 90) {
+                    			count = (Integer.valueOf(selfAdr.getId().toString()) / 10) * 10;
+                    		} else {
+                    			count = 90 + numNews;
+                    		}
+                    		
+                    		return count;
                     	}
                     });
                 }
@@ -162,7 +172,7 @@ public class LeaderSelectionScenario {
                 StochasticProcess startPeers = new StochasticProcess() {
                     {
                         eventInterArrivalTime(uniform(1000, 1100));
-                        raise(100, startNodeOp, new BasicIntSequentialDistribution(1));
+                        raise(100, startNodeOp, new BasicIntSequentialDistribution(1), new IntegerUniformDistribution(1, 3, new Random()));
                     }
                 };
 
