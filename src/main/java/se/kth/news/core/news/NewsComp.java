@@ -17,13 +17,20 @@
  */
 package se.kth.news.core.news;
 
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import se.kth.news.core.leader.Election;
 import se.kth.news.core.leader.LeaderSelectPort;
 import se.kth.news.core.leader.LeaderUpdate;
 import se.kth.news.core.news.data.INewsItemDAO;
+import se.kth.news.core.news.data.NewsItem;
 import se.kth.news.core.news.util.NewsView;
 import se.kth.news.play.Ping;
 import se.kth.news.play.Pong;
@@ -35,6 +42,7 @@ import se.sics.kompics.Positive;
 import se.sics.kompics.Start;
 import se.sics.kompics.network.Network;
 import se.sics.kompics.network.Transport;
+import se.sics.kompics.simulator.util.GlobalView;
 import se.sics.kompics.timer.Timer;
 import se.sics.ktoolbox.croupier.CroupierPort;
 import se.sics.ktoolbox.croupier.event.CroupierSample;
@@ -46,7 +54,6 @@ import se.sics.ktoolbox.util.network.KContentMsg;
 import se.sics.ktoolbox.util.network.KHeader;
 import se.sics.ktoolbox.util.network.basic.BasicContentMsg;
 import se.sics.ktoolbox.util.network.basic.BasicHeader;
-import se.sics.ktoolbox.util.other.Container;
 import se.sics.ktoolbox.util.overlays.view.OverlayViewUpdate;
 import se.sics.ktoolbox.util.overlays.view.OverlayViewUpdatePort;
 
@@ -72,7 +79,6 @@ public class NewsComp extends ComponentDefinition {
     private KAddress selfAdr;
     private Identifier gradientOId;
     private INewsItemDAO newItemDAO;
-    private int x = 0;
     //*******************************INTERNAL_STATE*****************************
     private NewsView localNewsView;
 
@@ -90,6 +96,7 @@ public class NewsComp extends ComponentDefinition {
         subscribe(handleLeader, leaderPort);
         subscribe(handlePing, networkPort);
         subscribe(handlePong, networkPort);
+        subscribe(handleNewsItem, networkPort);
     }
 
     Handler handleStart = new Handler<Start>() {
@@ -101,7 +108,7 @@ public class NewsComp extends ComponentDefinition {
     };
 
     private void updateLocalNewsView() {
-    	int newsCount = newItemDAO.getCount();
+    	int newsCount = newItemDAO.size();
     	
         localNewsView = new NewsView(selfAdr.getId(), newsCount);
         LOG.debug("{}informing overlays of new view", logPrefix);
@@ -111,9 +118,34 @@ public class NewsComp extends ComponentDefinition {
     Handler handleCroupierSample = new Handler<CroupierSample<NewsView>>() {
         @Override
         public void handle(CroupierSample<NewsView> castSample) {
+        	if (castSample.publicSample.isEmpty()) {
+                return;
+            }
+        	
+        	floodNewsItems(castSample);
         }
     };
-
+        				
+    private void floodNewsItems(CroupierSample<NewsView> castSample) {
+    	Set<Identifier> croupierSet = castSample.publicSample.keySet();
+    	
+    	List<NewsItem> newsItems = newItemDAO.getAll();
+		for(NewsItem newsItem : newsItems) {
+			newsItem.reduceTtl();
+			if(newsItem.getTtl() > 0) {
+				for(Identifier key: croupierSet) {
+					disseminateNewsItem(castSample.publicSample.get(key).getSource(), newsItem.copy());
+				}
+			}
+		}
+    }
+    
+    private void disseminateNewsItem(KAddress neighbour, NewsItem newsItem) {
+    	KHeader header = new BasicHeader(selfAdr, neighbour, Transport.UDP);
+		KContentMsg msg = new BasicContentMsg(header, newsItem);
+		trigger(msg, networkPort);
+    }
+    
     Handler handleGradientSample = new Handler<TGradientSample>() {
         @Override
         public void handle(TGradientSample sample) {   
@@ -127,7 +159,44 @@ public class NewsComp extends ComponentDefinition {
         	leader = event.leaderAdr;
         }
     };
+    
+    ClassMatchedHandler handleNewsItem
+    	= new ClassMatchedHandler<NewsItem, KContentMsg<?, ?, NewsItem>>() {
 
+        @Override
+        public void handle(NewsItem newsItem, KContentMsg<?, ?, NewsItem> container) {
+            LOG.info("{} received {} from:{}", logPrefix, newsItem, container.getHeader().getSource());
+            updateGlobalNumMessagesView();
+            if(newItemDAO.cotains(newsItem)) {
+            	LOG.debug("{} received {} already exists", logPrefix, newsItem);
+            } else {
+            	newItemDAO.save(newsItem);
+            	updateGlobalNewsCoverageView();
+            	updateGlobalNodeKnowlegeView();
+            }
+            
+        }
+    };
+    
+    private void updateGlobalNumMessagesView() {
+    	GlobalView gv = config().getValue("simulation.globalview", GlobalView.class);
+    	gv.setValue("simulation.num_messages", gv.getValue("simulation.num_messages", Integer.class) + 1) ;
+    }
+    
+    private void updateGlobalNewsCoverageView() {
+    	GlobalView gv = config().getValue("simulation.globalview", GlobalView.class);
+    	Set<String> data = gv.getValue("simulation.news_coverage", HashSet.class) ;
+        data.add(selfAdr.getId().toString());
+        gv.setValue("simulation.news_coverage", data);
+    }
+    
+    private void updateGlobalNodeKnowlegeView() {
+    	GlobalView gv = config().getValue("simulation.globalview", GlobalView.class);
+    	Map<String, Integer> data = gv.getValue("simulation.node_knowlege", HashMap.class) ;
+    	data.put(selfAdr.getId().toString(), newItemDAO.size());
+        gv.setValue("simulation.node_knowlege", data);
+    }
+    
     ClassMatchedHandler handlePing
             = new ClassMatchedHandler<Ping, KContentMsg<?, ?, Ping>>() {
 

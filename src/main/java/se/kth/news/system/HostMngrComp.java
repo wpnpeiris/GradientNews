@@ -57,6 +57,7 @@ public class HostMngrComp extends ComponentDefinition {
     private KAddress bootstrapServer;
     private Identifier overlayId;
     private INewsItemDAO newItemDAO;
+    private boolean leaderSelect;
     //***************************INTERNAL_STATE*********************************
     private Component bootstrapClientComp;
     private Component overlayMngrComp;

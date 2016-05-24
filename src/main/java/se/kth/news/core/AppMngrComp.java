@@ -94,6 +94,7 @@ public class AppMngrComp extends ComponentDefinition {
             LOG.info("{}overlays connected", logPrefix);
             connectLeaderSelect();
             connectNews();
+            
             trigger(Start.event, leaderSelectComp.control());
             trigger(Start.event, newsComp.control());
         }

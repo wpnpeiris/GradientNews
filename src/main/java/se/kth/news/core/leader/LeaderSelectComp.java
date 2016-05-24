@@ -93,7 +93,7 @@ public class LeaderSelectComp extends ComponentDefinition {
     }
 
     private void updateLocalNewsView() {
-    	int newsCount = newItemDAO.getCount();
+    	int newsCount = newItemDAO.size();
         localNewsView = new NewsView(selfAdr.getId(), newsCount);
     }
     Handler handleStart = new Handler<Start>() {
@@ -106,42 +106,42 @@ public class LeaderSelectComp extends ComponentDefinition {
     Handler handleGradientSample = new Handler<TGradientSample>() {
         @Override
         public void handle(TGradientSample sample) {
-        	if(gradientNotStablized && GRADIENT_STABLE_ROUND == (currentRound++) ){
-        		LOG.info("{} Gradient stablized for node: " + selfAdr.getId(), logPrefix);
-        		gradientNotStablized = false;
-        		
-        		Container<KAddress, NewsView> highUtilNeighbour = getHighUtilNeighbour(sample);
-        		int neighbourUtilVal = highUtilNeighbour.getContent().localNewsCount;
-        		if(localNewsView.localNewsCount >= neighbourUtilVal) {
-            		LOG.info("{} Node: " + selfAdr.getId() +  " is eligable for leader", logPrefix);
-            		
-            		for(Object obj: sample.getGradientNeighbours()) {
-            			Container<KAddress, NewsView> neighbour = (Container<KAddress, NewsView>) obj;
-            			KAddress neighbourAddr = neighbour.getSource();
-        				KHeader header = new BasicHeader(selfAdr, neighbourAddr, Transport.UDP);
-                		KContentMsg msg = new BasicContentMsg(header, new Election(localNewsView.localNewsCount));
-                		trigger(msg, networkPort);
-            		}
-            		
-            		ScheduleTimeout spt = new ScheduleTimeout(5000);
-            		ElectionTimeout timeout = new ElectionTimeout(spt);
-            		spt.setTimeoutEvent(timeout);
-    				trigger(spt, timerPort);
-        		}
-        	}   
-        	
-        	
-//        	Disseminate Leader information
-        	if(leaderSelected != null) {
-//        		LOG.info("{} Dissiminate LeaderUpdate from:{} ", logPrefix, selfAdr);
-        		for(Object obj: sample.gradientFingers) {
-        			Container<KAddress, NewsView> neighbour = (Container<KAddress, NewsView>) obj;
-        			KAddress neighbourAddr = neighbour.getSource();
-        			KHeader header = new BasicHeader(selfAdr, neighbourAddr, Transport.UDP);
-            		KContentMsg msg = new BasicContentMsg(header, new LeaderUpdate(leaderSelected));
-            		trigger(msg, networkPort);
-        		}
-        	} 
+//        	if(gradientNotStablized && GRADIENT_STABLE_ROUND == (currentRound++) ){
+//        		LOG.info("{} Gradient stablized for node: " + selfAdr.getId(), logPrefix);
+//        		gradientNotStablized = false;
+//        		
+//        		Container<KAddress, NewsView> highUtilNeighbour = getHighUtilNeighbour(sample);
+//        		int neighbourUtilVal = highUtilNeighbour.getContent().localNewsCount;
+//        		if(localNewsView.localNewsCount >= neighbourUtilVal) {
+//            		LOG.info("{} Node: " + selfAdr.getId() +  " is eligable for leader", logPrefix);
+//            		
+//            		for(Object obj: sample.getGradientNeighbours()) {
+//            			Container<KAddress, NewsView> neighbour = (Container<KAddress, NewsView>) obj;
+//            			KAddress neighbourAddr = neighbour.getSource();
+//        				KHeader header = new BasicHeader(selfAdr, neighbourAddr, Transport.UDP);
+//                		KContentMsg msg = new BasicContentMsg(header, new Election(localNewsView.localNewsCount));
+//                		trigger(msg, networkPort);
+//            		}
+//            		
+//            		ScheduleTimeout spt = new ScheduleTimeout(5000);
+//            		ElectionTimeout timeout = new ElectionTimeout(spt);
+//            		spt.setTimeoutEvent(timeout);
+//    				trigger(spt, timerPort);
+//        		}
+//        	}   
+//        	
+//        	
+////        	Disseminate Leader information
+//        	if(leaderSelected != null) {
+////        		LOG.info("{} Dissiminate LeaderUpdate from:{} ", logPrefix, selfAdr);
+//        		for(Object obj: sample.gradientFingers) {
+//        			Container<KAddress, NewsView> neighbour = (Container<KAddress, NewsView>) obj;
+//        			KAddress neighbourAddr = neighbour.getSource();
+//        			KHeader header = new BasicHeader(selfAdr, neighbourAddr, Transport.UDP);
+//            		KContentMsg msg = new BasicContentMsg(header, new LeaderUpdate(leaderSelected));
+//            		trigger(msg, networkPort);
+//        		}
+//        	} 
         }
     };
 

@@ -18,6 +18,7 @@
 package se.kth.news.sim.task2;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
@@ -115,18 +116,27 @@ public class LeaderSelectionScenario {
                 @Override
                 public HostMngrComp.Init getComponentInit() {
                     return new HostMngrComp.Init(selfAdr, ScenarioSetup.bootstrapServer, ScenarioSetup.newsOverlayId, new INewsItemDAO() {
-                    	public void add(NewsItem newsItem) {
+                    	public void save(NewsItem newsItem) {
                     	}
 
                     	public NewsItem get(String id) {
-                    		return new NewsItem(id, "");
+                    		return new NewsItem(id, "Test News", 7);
                     	}
-
+                    	
+                    	public List<NewsItem> getAll() {
+                    		return null;
+                    	}
+                    	
                     	public boolean isEmpty() {
                     		return false;
                     	}
                     	
-                    	public int getCount() {
+                    	public boolean cotains(NewsItem newsItem) {
+                    		return false;
+                    		
+                    	}
+                    	
+                    	public int size() {
 //                    		Assume number of news items varies according to node id
 //                    		i.e. node 12 has 10 news items, node 22 has 20 items, etc
 //                    		System.out.println(">>>> " + numNews);

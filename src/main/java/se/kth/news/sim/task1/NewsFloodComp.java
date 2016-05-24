@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import se.kth.news.core.news.data.INewsItemDAO;
+import se.kth.news.core.news.data.NewsItem;
 import se.kth.news.system.HostMngrComp;
 import se.sics.kompics.Channel;
 import se.sics.kompics.Component;
@@ -15,18 +16,25 @@ import se.sics.kompics.Handler;
 import se.sics.kompics.Positive;
 import se.sics.kompics.Start;
 import se.sics.kompics.network.Network;
+import se.sics.kompics.network.Transport;
 import se.sics.kompics.timer.Timer;
 import se.sics.ktoolbox.util.identifiable.Identifier;
 import se.sics.ktoolbox.util.network.KAddress;
+import se.sics.ktoolbox.util.network.KContentMsg;
+import se.sics.ktoolbox.util.network.KHeader;
+import se.sics.ktoolbox.util.network.basic.BasicContentMsg;
+import se.sics.ktoolbox.util.network.basic.BasicHeader;
 
 /**
  * @author pradeeppeiris
  *
  */
-public class NewsSimClient extends ComponentDefinition {
-	private static final Logger LOG = LoggerFactory.getLogger(NewsSimClient.class);
+public class NewsFloodComp extends ComponentDefinition {
+	private static final Logger LOG = LoggerFactory.getLogger(NewsFloodComp.class);
     private String logPrefix = " ";
 
+    public static final int TTL = 7;
+    
     //*****************************CONNECTIONS**********************************
     Positive<Timer> timerPort = requires(Timer.class);
     Positive<Network> networkPort = requires(Network.class);
@@ -35,10 +43,12 @@ public class NewsSimClient extends ComponentDefinition {
     private KAddress bootstrapServer;
     private Identifier overlayId;
     private INewsItemDAO newItemDAO;
+    private boolean initNewsDisseminate;
     
 	private Component hostMngrComp;
 	
-	public  NewsSimClient(Init init) {
+	
+	public  NewsFloodComp(Init init) {
 		selfAdr = init.selfAdr;
         logPrefix = "<nid:" + selfAdr.getId() + ">";
         LOG.info("{}initiating...", logPrefix);
@@ -47,6 +57,7 @@ public class NewsSimClient extends ComponentDefinition {
         bootstrapServer = init.bootstrapServer;
         overlayId = init.overlayId;
         newItemDAO = init.newItemDAO;
+        initNewsDisseminate = init.initNewsDisseminate;
         
         subscribe(handleStart, control);
 	}
@@ -58,8 +69,20 @@ public class NewsSimClient extends ComponentDefinition {
             connectHostMngr();
             
             trigger(Start.event, hostMngrComp.control());
+            
+            if(initNewsDisseminate) {
+            	startNewsDisseminate();
+            }
         }
 	};
+	
+	private void startNewsDisseminate() {
+		LOG.info("{} starting news disseminate", logPrefix);
+		String nodeId = selfAdr.getId().toString();
+		KHeader header = new BasicHeader(selfAdr, selfAdr, Transport.UDP);
+		KContentMsg msg = new BasicContentMsg(header, new NewsItem("news" + nodeId, "News from " + nodeId, TTL));
+		trigger(msg, networkPort);
+	}
 	
 	private void connectHostMngr() {
 		hostMngrComp = create(HostMngrComp.class, new HostMngrComp.Init(selfAdr, bootstrapServer, overlayId, newItemDAO));
@@ -68,18 +91,20 @@ public class NewsSimClient extends ComponentDefinition {
         
         
 	}
-	public static class Init extends se.sics.kompics.Init<NewsSimClient> {
+	public static class Init extends se.sics.kompics.Init<NewsFloodComp> {
 
         public final KAddress selfAdr;
         public final KAddress bootstrapServer;
         public final Identifier overlayId;
         public final INewsItemDAO newItemDAO;
+        public final boolean initNewsDisseminate;
 
-        public Init(KAddress selfAdr, KAddress bootstrapServer, Identifier overlayId, INewsItemDAO newItemDAO) {
+        public Init(KAddress selfAdr, KAddress bootstrapServer, Identifier overlayId, INewsItemDAO newItemDAO, boolean initNewsDisseminate) {
             this.selfAdr = selfAdr;
             this.bootstrapServer = bootstrapServer;
             this.overlayId = overlayId;
             this.newItemDAO = newItemDAO;
+            this.initNewsDisseminate = initNewsDisseminate;
         }
     }
 }

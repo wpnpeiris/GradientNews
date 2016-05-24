@@ -17,25 +17,27 @@
  */
 package se.kth.news.sim.task1;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
-import java.util.Random;
 
 import se.kth.news.core.news.data.INewsItemDAO;
 import se.kth.news.core.news.data.NewsItem;
 import se.kth.news.sim.ScenarioSetup;
 import se.kth.news.sim.compatibility.SimNodeIdExtractor;
-import se.kth.news.system.HostMngrComp;
+import se.sics.kompics.Init;
 import se.sics.kompics.network.Address;
 import se.sics.kompics.simulator.SimulationScenario;
 import se.sics.kompics.simulator.adaptor.Operation;
-import se.sics.kompics.simulator.adaptor.Operation2;
-import se.sics.kompics.simulator.adaptor.distributions.IntegerUniformDistribution;
+import se.sics.kompics.simulator.adaptor.Operation1;
 import se.sics.kompics.simulator.adaptor.distributions.extra.BasicIntSequentialDistribution;
 import se.sics.kompics.simulator.events.system.SetupEvent;
 import se.sics.kompics.simulator.events.system.StartNodeEvent;
 import se.sics.kompics.simulator.network.identifier.IdentifierExtractor;
 import se.sics.kompics.simulator.run.LauncherComp;
+import se.sics.kompics.simulator.util.GlobalView;
 import se.sics.ktoolbox.omngr.bootstrap.BootstrapServerComp;
 import se.sics.ktoolbox.util.network.KAddress;
 import se.sics.ktoolbox.util.overlays.id.OverlayIdRegistry;
@@ -44,6 +46,9 @@ import se.sics.ktoolbox.util.overlays.id.OverlayIdRegistry;
  * @author Alex Ormenisan <aaor@kth.se>
  */
 public class NewsFloodScenario {
+	
+	private static final int NUM_NODES = 500;
+	public static final int NUM_MESSAGES = 5;
 
     static Operation<SetupEvent> systemSetupOp = new Operation<SetupEvent>() {
         @Override
@@ -58,10 +63,53 @@ public class NewsFloodScenario {
                 public IdentifierExtractor getIdentifierExtractor() {
                     return new SimNodeIdExtractor();
                 }
+                
+                @Override
+				public void setupGlobalView(GlobalView gv) {
+                	gv.setValue("simulation.num_messages", 0);
+                	gv.setValue("simulation.num_nodes", NUM_NODES);
+					gv.setValue("simulation.news_coverage", new HashSet<String>());
+					gv.setValue("simulation.node_knowlege", new HashMap<String, Integer>());
+				}
             };
         }
     };
+    
+    static Operation startObserverOp = new Operation<StartNodeEvent>() {
+		@Override
+        public StartNodeEvent generate() {
+			return new StartNodeEvent() {
+				KAddress selfAdr;
 
+                {
+                    selfAdr = ScenarioSetup.bootstrapServer;
+                }
+                
+                @Override
+                public Map<String, Object> initConfigUpdate() {
+                    HashMap<String, Object> config = new HashMap<>();
+                    config.put("newsflood.simulation.checktimeout", 2000);
+                    return config;
+                }
+                
+                @Override
+                public Address getNodeAddress() {
+                    return selfAdr;
+                }
+
+                @Override
+                public Class getComponentDefinition() {
+                    return NewsFloodObserver.class;
+                }
+                
+                @Override
+                public Init getComponentInit() {
+                    return new NewsFloodObserver.Init(true);
+                }
+			};
+		}
+	};
+	
     static Operation<StartNodeEvent> startBootstrapServerOp = new Operation<StartNodeEvent>() {
 
         @Override
@@ -91,10 +139,10 @@ public class NewsFloodScenario {
         }
     };
 
-    static Operation2<StartNodeEvent, Integer, Integer> startNodeOp = new Operation2<StartNodeEvent, Integer, Integer>() {
+    static Operation1<StartNodeEvent, Integer> startNodeOp = new Operation1<StartNodeEvent, Integer>() {
 
         @Override
-        public StartNodeEvent generate(final Integer nodeId, final Integer numNews) {
+        public StartNodeEvent generate(final Integer nodeId) {
             return new StartNodeEvent() {
                 KAddress selfAdr;
 
@@ -109,27 +157,38 @@ public class NewsFloodScenario {
 
                 @Override
                 public Class getComponentDefinition() {
-                    return NewsSimClient.class;
+                    return NewsFloodComp.class;
                 }
 
                 @Override
-                public NewsSimClient.Init getComponentInit() {
-                    return new NewsSimClient.Init(selfAdr, ScenarioSetup.bootstrapServer, ScenarioSetup.newsOverlayId, new INewsItemDAO() {
-                    	public void add(NewsItem newsItem) {
+                public NewsFloodComp.Init getComponentInit() {
+                    return new NewsFloodComp.Init(selfAdr, ScenarioSetup.bootstrapServer, ScenarioSetup.newsOverlayId, new INewsItemDAO() {
+                    	private Map<String, NewsItem> data =  new HashMap<String, NewsItem>();
+                    	
+                    	public void save(NewsItem newsItem) {
+                    		data.put(newsItem.getId(), newsItem);
                     	}
 
                     	public NewsItem get(String id) {
-                    		return new NewsItem(id, "");
+                    		return null;
                     	}
-
+                    	
+                    	public List<NewsItem> getAll() {
+                    		return new ArrayList<NewsItem>(data.values());
+                    	}
+                    	
+                    	public boolean cotains(NewsItem newsItem) {
+                    		return data.containsKey(newsItem.getId());
+                    	}
+                    	
                     	public boolean isEmpty() {
                     		return false;
                     	}
                     	
-                    	public int getCount() {
-                    		return 0;
+                    	public int size() {
+                    		return data.size();
                     	}
-                    });
+                    }, nodeId > (NUM_NODES - NUM_MESSAGES) ? true : false);
                 }
 
                 @Override
@@ -153,6 +212,11 @@ public class NewsFloodScenario {
                         raise(1, systemSetupOp);
                     }
                 };
+                SimulationScenario.StochasticProcess observer = new SimulationScenario.StochasticProcess() {
+                    {
+                        raise(1, startObserverOp);
+                    }
+                };
                 StochasticProcess startBootstrapServer = new StochasticProcess() {
                     {
                         eventInterArrivalTime(constant(1000));
@@ -161,13 +225,14 @@ public class NewsFloodScenario {
                 };
                 StochasticProcess startPeers = new StochasticProcess() {
                     {
-                        eventInterArrivalTime(uniform(1000, 1100));
-                        raise(20, startNodeOp, new BasicIntSequentialDistribution(1), new IntegerUniformDistribution(1, 3, new Random()));
+                        eventInterArrivalTime(uniform(1000, 100));
+                        raise(NUM_NODES, startNodeOp, new BasicIntSequentialDistribution(1));
                     }
                 };
 
                 systemSetup.start();
-                startBootstrapServer.startAfterTerminationOf(1000, systemSetup);
+                observer.startAfterTerminationOf(1000, systemSetup);
+                startBootstrapServer.startAfterTerminationOf(1000, observer);
                 startPeers.startAfterTerminationOf(1000, startBootstrapServer);
                 terminateAfterTerminationOf(1000*1000, startPeers);
             }
