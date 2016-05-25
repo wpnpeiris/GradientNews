@@ -73,7 +73,8 @@ public class LeaderSelectComp extends ComponentDefinition {
     private NewsView localNewsView;
     private Set<ElectionAck> acks = new HashSet<ElectionAck>();
     
-    private KAddress leaderSelected;
+//    private KAddress leaderSelected;
+    private boolean callElection = false;
     
     public LeaderSelectComp(Init init) {
         selfAdr = init.selfAdr;
@@ -88,8 +89,10 @@ public class LeaderSelectComp extends ComponentDefinition {
         subscribe(handleGradientSample, gradientPort);
         subscribe(handleElection, networkPort);
         subscribe(handleElectionAck, networkPort);
-        subscribe(handleLeaderUpdate, networkPort);
+//        subscribe(handleLeaderUpdate, networkPort);
+        subscribe(handleInitElection, networkPort);
         subscribe(timeoutHandler, timerPort);
+        
     }
 
     private void updateLocalNewsView() {
@@ -103,54 +106,48 @@ public class LeaderSelectComp extends ComponentDefinition {
         }
     };
     
+    
     Handler handleGradientSample = new Handler<TGradientSample>() {
         @Override
         public void handle(TGradientSample sample) {
-//        	if(gradientNotStablized && GRADIENT_STABLE_ROUND == (currentRound++) ){
-//        		LOG.info("{} Gradient stablized for node: " + selfAdr.getId(), logPrefix);
-//        		gradientNotStablized = false;
-//        		
-//        		Container<KAddress, NewsView> highUtilNeighbour = getHighUtilNeighbour(sample);
-//        		int neighbourUtilVal = highUtilNeighbour.getContent().localNewsCount;
-//        		if(localNewsView.localNewsCount >= neighbourUtilVal) {
-//            		LOG.info("{} Node: " + selfAdr.getId() +  " is eligable for leader", logPrefix);
-//            		
-//            		for(Object obj: sample.getGradientNeighbours()) {
-//            			Container<KAddress, NewsView> neighbour = (Container<KAddress, NewsView>) obj;
-//            			KAddress neighbourAddr = neighbour.getSource();
-//        				KHeader header = new BasicHeader(selfAdr, neighbourAddr, Transport.UDP);
-//                		KContentMsg msg = new BasicContentMsg(header, new Election(localNewsView.localNewsCount));
-//                		trigger(msg, networkPort);
-//            		}
-//            		
-//            		ScheduleTimeout spt = new ScheduleTimeout(5000);
-//            		ElectionTimeout timeout = new ElectionTimeout(spt);
-//            		spt.setTimeoutEvent(timeout);
-//    				trigger(spt, timerPort);
-//        		}
-//        	}   
-//        	
-//        	
-////        	Disseminate Leader information
-//        	if(leaderSelected != null) {
-////        		LOG.info("{} Dissiminate LeaderUpdate from:{} ", logPrefix, selfAdr);
-//        		for(Object obj: sample.gradientFingers) {
-//        			Container<KAddress, NewsView> neighbour = (Container<KAddress, NewsView>) obj;
-//        			KAddress neighbourAddr = neighbour.getSource();
-//        			KHeader header = new BasicHeader(selfAdr, neighbourAddr, Transport.UDP);
-//            		KContentMsg msg = new BasicContentMsg(header, new LeaderUpdate(leaderSelected));
-//            		trigger(msg, networkPort);
-//        		}
-//        	} 
+        	if(callElection) {
+        		callElection = false;
+        		callLeaderElection(sample);
+        	}
         }
     };
+    
+    
+    
+    private void callLeaderElection(TGradientSample sample) {
+    	Container<KAddress, NewsView> highUtilNeighbour = getHighUtilNeighbour(sample);
+		int neighbourUtilVal = highUtilNeighbour.getContent().localNewsCount;
+		if(localNewsView.localNewsCount >= neighbourUtilVal) {
+			LOG.info("{}  Node: " + selfAdr.getId() +  " is eligable for leader amoung: {}", logPrefix, sample.getGradientNeighbours());
+			for(Object obj: sample.getGradientNeighbours()) {
+				Container<KAddress, NewsView> neighbour = (Container<KAddress, NewsView>) obj;
+				KAddress neighbourAddr = neighbour.getSource();
+				KHeader header = new BasicHeader(selfAdr, neighbourAddr, Transport.UDP);
+				KContentMsg msg = new BasicContentMsg(header, new Election(localNewsView.localNewsCount));
+				trigger(msg, networkPort);
+			}
+			
+			startElectionTimeoutTimer();
+		}
+    }
+    private void startElectionTimeoutTimer() {
+    	ScheduleTimeout spt = new ScheduleTimeout(5000);
+		ElectionTimeout timeout = new ElectionTimeout(spt);
+		spt.setTimeoutEvent(timeout);
+		trigger(spt, timerPort);
+    }
 
     Handler<ElectionTimeout> timeoutHandler = new Handler<ElectionTimeout>() {
 		public void handle(ElectionTimeout event) {
 			if(acks.size() == 0) {
 				LOG.info("{} Leader is selected as:{} ", logPrefix, selfAdr);
-				leaderSelected = selfAdr;
-	            trigger(new LeaderUpdate(selfAdr), leaderUpdate);
+//				leaderSelected = selfAdr;
+	            trigger(new LeaderUpdate(), leaderUpdate);
 			}
 		}
 	};
@@ -165,11 +162,19 @@ public class LeaderSelectComp extends ComponentDefinition {
         public void handle(Election content, KContentMsg<?, ?, Election> container) {
             LOG.info("{} received Election message at:{} from:{}", logPrefix, selfAdr, container.getHeader().getSource());
             if(Integer.valueOf(selfAdr.getId().toString()) >= Integer.valueOf(container.getHeader().getSource().getId().toString())){
-	            System.out.println(localNewsView.localNewsCount + " vs " + content.getUtility());	
 	            if(localNewsView.localNewsCount >= content.getUtility()) {
 	            		trigger(container.answer(new ElectionAck()), networkPort);		
 	            } 
             } 
+        }
+    };
+    
+    ClassMatchedHandler handleInitElection = new ClassMatchedHandler<InitElection, KContentMsg<?, ?, InitElection>>() {
+
+        @Override
+        public void handle(InitElection content, KContentMsg<?, ?, InitElection> container) {
+            LOG.info("{} received InitElection at:{} ", logPrefix, selfAdr);
+            callElection = true;
         }
     };
     
@@ -179,18 +184,6 @@ public class LeaderSelectComp extends ComponentDefinition {
         public void handle(ElectionAck content, KContentMsg<?, ?, ElectionAck> container) {
             LOG.info("{} received LeaderAck at:{} from:{}", logPrefix, selfAdr, container.getHeader().getSource());
             acks.add(content);
-        }
-    };
-    
-    ClassMatchedHandler handleLeaderUpdate = new ClassMatchedHandler<LeaderUpdate, KContentMsg<?, ?, LeaderUpdate>>() {
-
-        @Override
-        public void handle(LeaderUpdate content, KContentMsg<?, ?, LeaderUpdate> container) {
-            if(leaderSelected == null) {
-            	LOG.info("{} XXXX received LeaderUpdate at:{} from:{}", logPrefix, selfAdr, container.getHeader().getSource());
-            	leaderSelected = content.leaderAdr;
-            	trigger(new LeaderUpdate(content.leaderAdr), leaderUpdate);
-            }
         }
     };
     

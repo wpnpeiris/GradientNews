@@ -19,7 +19,6 @@ package se.kth.news.core.news;
 
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -27,6 +26,8 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import se.kth.news.core.leader.InitElection;
+import se.kth.news.core.leader.LeaderNotification;
 import se.kth.news.core.leader.LeaderSelectPort;
 import se.kth.news.core.leader.LeaderUpdate;
 import se.kth.news.core.news.data.INewsItemDAO;
@@ -54,6 +55,7 @@ import se.sics.ktoolbox.util.network.KContentMsg;
 import se.sics.ktoolbox.util.network.KHeader;
 import se.sics.ktoolbox.util.network.basic.BasicContentMsg;
 import se.sics.ktoolbox.util.network.basic.BasicHeader;
+import se.sics.ktoolbox.util.other.Container;
 import se.sics.ktoolbox.util.overlays.view.OverlayViewUpdate;
 import se.sics.ktoolbox.util.overlays.view.OverlayViewUpdatePort;
 
@@ -64,7 +66,11 @@ public class NewsComp extends ComponentDefinition {
 
     private static final Logger LOG = LoggerFactory.getLogger(NewsComp.class);
     private String logPrefix = " ";
-
+    
+    private final int GRADIENT_CONSECUTIVE_ROUNDS = 20;
+    private String neighbourIdList = "EMPTY";
+    private int gradientRoundFlag = 0;
+    private boolean gradientStable = false;
     
     //*******************************CONNECTIONS********************************
     Positive<Timer> timerPort = requires(Timer.class);
@@ -97,6 +103,7 @@ public class NewsComp extends ComponentDefinition {
         subscribe(handlePing, networkPort);
         subscribe(handlePong, networkPort);
         subscribe(handleNewsItem, networkPort);
+        subscribe(handleLeaderNotification, networkPort);
     }
 
     Handler handleStart = new Handler<Start>() {
@@ -146,17 +153,93 @@ public class NewsComp extends ComponentDefinition {
 		trigger(msg, networkPort);
     }
     
+    
+    
     Handler handleGradientSample = new Handler<TGradientSample>() {
         @Override
         public void handle(TGradientSample sample) {   
+    		if(!gradientStable) {
+//    			updateGlobalOverlayConvergeView();
+    			checkGradientStablity(sample);
+    		} 
+    		
+    		if(leader != null) {
+        		disseminateLeaderInfo(sample);
+        	} 
         }
     };
+    
+    private void disseminateLeaderInfo(TGradientSample sample) {
+    	StringBuffer sb = new StringBuffer();
+    	for(Object obj: sample.getGradientNeighbours()) {
+			Container<KAddress, NewsView> neighbour = (Container<KAddress, NewsView>) obj;
+			KAddress neighbourAddr = neighbour.getSource();
+			KHeader header = new BasicHeader(selfAdr, neighbourAddr, Transport.UDP);
+    		KContentMsg msg = new BasicContentMsg(header, new LeaderNotification(leader));
+    		trigger(msg, networkPort);
+    		sb.append(neighbourAddr.getId()).append(", ");
+		}
+
+    }
+    
+    private void updateGlobalOverlayConvergeView() {
+    	GlobalView gv = config().getValue("simulation.globalview", GlobalView.class);
+    	Map<String, Integer> data = gv.getValue("simulation.converge_rounds", HashMap.class) ;
+    	String nodeId = selfAdr.getId().toString();
+    	if(data.containsKey(nodeId)){
+    		data.put(nodeId, data.get(nodeId) + 1);
+    	} else {
+    		data.put(nodeId, 1);
+    	}
+    	
+        gv.setValue("simulation.converge_rounds", data);
+    }
+    
+    private void updateGlobalConvergeNodeCount(){
+    	GlobalView gv = config().getValue("simulation.globalview", GlobalView.class);
+    	gv.setValue("simulation.converge_node_count", gv.getValue("simulation.converge_node_count", Integer.class) + 1);
+    	
+    }
+    
+    private void checkGradientStablity(TGradientSample sample) {
+    	String latestNeighbourIdList = createNeighbourIdList(sample);
+		if(latestNeighbourIdList.equals(neighbourIdList)) {
+    		gradientRoundFlag++;
+    	} else {
+    		gradientRoundFlag = 0;
+    		neighbourIdList = latestNeighbourIdList;
+    	}
+		
+    	if(gradientRoundFlag == GRADIENT_CONSECUTIVE_ROUNDS) {
+    		gradientStable = true;
+//    		updateGlobalConvergeNodeCount();
+    		
+    		triggerInitElection();
+    	}
+    }
+    
+    private void triggerInitElection() {
+    	KHeader header = new BasicHeader(selfAdr, selfAdr, Transport.UDP);
+		KContentMsg msg = new BasicContentMsg(header, new InitElection());
+		trigger(msg, networkPort);
+    }
+    
+    private String createNeighbourIdList(TGradientSample sample) {
+    	StringBuilder sb = new StringBuilder();
+    	for(Object obj: sample.getGradientNeighbours()) {
+    		Container<KAddress, NewsView> neighbour = (Container<KAddress, NewsView>) obj;
+    		KAddress neighbourAddr = neighbour.getSource();
+    		sb.append(neighbourAddr.getId().toString() + "_");
+    	}
+    	
+    	return sb.toString();
+    }
     
     Handler handleLeader = new Handler<LeaderUpdate>() {
         @Override
         public void handle(LeaderUpdate event) {
-        	LOG.info("{} Update Leader as :{} ", logPrefix, event.leaderAdr.getId());
-        	leader = event.leaderAdr;
+        	LOG.info("{} Elected Leader", logPrefix);
+        	leader = selfAdr;
         }
     };
     
@@ -177,6 +260,25 @@ public class NewsComp extends ComponentDefinition {
             
         }
     };
+    
+    ClassMatchedHandler handleLeaderNotification = new ClassMatchedHandler<LeaderNotification, KContentMsg<?, ?, LeaderNotification>>() {
+
+        @Override
+        public void handle(LeaderNotification content, KContentMsg<?, ?, LeaderNotification> container) {
+            if(leader == null) {
+            	LOG.info("{} XXXX received LeaderUpdate at:{} from:{}", logPrefix, selfAdr, container.getHeader().getSource());
+            	leader = content.leaderAdr;
+            	updateGlobalLeaderDisseminationView();
+            }
+        }
+    };
+    
+    private void updateGlobalLeaderDisseminationView() {
+    	GlobalView gv = config().getValue("simulation.globalview", GlobalView.class);
+    	Set<String> data = gv.getValue("simulation.leader_coverage", HashSet.class) ;
+        data.add(selfAdr.getId().toString());
+        gv.setValue("simulation.leader_coverage", data);
+    }
     
     private void updateGlobalNumMessagesView() {
     	GlobalView gv = config().getValue("simulation.globalview", GlobalView.class);

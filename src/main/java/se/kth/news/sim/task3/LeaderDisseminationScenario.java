@@ -15,10 +15,11 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  */
-package se.kth.news.sim.task2;
+package se.kth.news.sim.task3;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -27,7 +28,9 @@ import se.kth.news.core.news.data.INewsItemDAO;
 import se.kth.news.core.news.data.NewsItem;
 import se.kth.news.sim.ScenarioSetup;
 import se.kth.news.sim.compatibility.SimNodeIdExtractor;
+import se.kth.news.sim.task1.NewsFloodObserver;
 import se.kth.news.system.HostMngrComp;
+import se.sics.kompics.Init;
 import se.sics.kompics.network.Address;
 import se.sics.kompics.simulator.SimulationScenario;
 import se.sics.kompics.simulator.adaptor.Operation;
@@ -38,6 +41,7 @@ import se.sics.kompics.simulator.events.system.SetupEvent;
 import se.sics.kompics.simulator.events.system.StartNodeEvent;
 import se.sics.kompics.simulator.network.identifier.IdentifierExtractor;
 import se.sics.kompics.simulator.run.LauncherComp;
+import se.sics.kompics.simulator.util.GlobalView;
 import se.sics.ktoolbox.omngr.bootstrap.BootstrapServerComp;
 import se.sics.ktoolbox.util.network.KAddress;
 import se.sics.ktoolbox.util.overlays.id.OverlayIdRegistry;
@@ -45,7 +49,7 @@ import se.sics.ktoolbox.util.overlays.id.OverlayIdRegistry;
 /**
  * @author Alex Ormenisan <aaor@kth.se>
  */
-public class LeaderSelectionScenario {
+public class LeaderDisseminationScenario {
 	private static final int NUM_NODES = 100;
 	
     static Operation<SetupEvent> systemSetupOp = new Operation<SetupEvent>() {
@@ -61,10 +65,51 @@ public class LeaderSelectionScenario {
                 public IdentifierExtractor getIdentifierExtractor() {
                     return new SimNodeIdExtractor();
                 }
+                
+                @Override
+				public void setupGlobalView(GlobalView gv) {
+                	gv.setValue("simulation.num_nodes", NUM_NODES);
+					gv.setValue("simulation.leader_coverage", new HashSet<String>());
+				}
             };
         }
     };
 
+    static Operation startObserverOp = new Operation<StartNodeEvent>() {
+		@Override
+        public StartNodeEvent generate() {
+			return new StartNodeEvent() {
+				KAddress selfAdr;
+
+                {
+                    selfAdr = ScenarioSetup.bootstrapServer;
+                }
+                
+                @Override
+                public Map<String, Object> initConfigUpdate() {
+                    HashMap<String, Object> config = new HashMap<>();
+                    config.put("newsflood.simulation.checktimeout", 2000);
+                    return config;
+                }
+                
+                @Override
+                public Address getNodeAddress() {
+                    return selfAdr;
+                }
+
+                @Override
+                public Class getComponentDefinition() {
+                    return LeaderDisseminationObserver.class;
+                }
+                
+                @Override
+                public Init getComponentInit() {
+                    return new LeaderDisseminationObserver.Init(true);
+                }
+			};
+		}
+	};
+	
     static Operation<StartNodeEvent> startBootstrapServerOp = new Operation<StartNodeEvent>() {
 
         @Override
@@ -175,6 +220,11 @@ public class LeaderSelectionScenario {
                         raise(1, systemSetupOp);
                     }
                 };
+                SimulationScenario.StochasticProcess observer = new SimulationScenario.StochasticProcess() {
+                    {
+                        raise(1, startObserverOp);
+                    }
+                };
                 StochasticProcess startBootstrapServer = new StochasticProcess() {
                     {
                         eventInterArrivalTime(constant(1000));
@@ -189,7 +239,8 @@ public class LeaderSelectionScenario {
                 };
 
                 systemSetup.start();
-                startBootstrapServer.startAfterTerminationOf(1000, systemSetup);
+                observer.startAfterTerminationOf(1000, systemSetup);
+                startBootstrapServer.startAfterTerminationOf(1000, observer);
                 startPeers.startAfterTerminationOf(1000, startBootstrapServer);
                 terminateAfterTerminationOf(1000*1000, startPeers);
             }
@@ -200,7 +251,7 @@ public class LeaderSelectionScenario {
     
     public static void main(String[] args) {
         SimulationScenario.setSeed(ScenarioSetup.scenarioSeed);
-        SimulationScenario simpleBootScenario = LeaderSelectionScenario.scenario1();
+        SimulationScenario simpleBootScenario = LeaderDisseminationScenario.scenario1();
         simpleBootScenario.simulate(LauncherComp.class);
     }
 }
