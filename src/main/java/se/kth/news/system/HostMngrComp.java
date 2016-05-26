@@ -57,6 +57,8 @@ public class HostMngrComp extends ComponentDefinition {
     private KAddress bootstrapServer;
     private Identifier overlayId;
     private INewsItemDAO newItemDAO;
+    private int networkType;
+    
     private boolean leaderSelect;
     //***************************INTERNAL_STATE*********************************
     private Component bootstrapClientComp;
@@ -71,7 +73,8 @@ public class HostMngrComp extends ComponentDefinition {
         bootstrapServer = init.bootstrapServer;
         overlayId = init.overlayId;
         newItemDAO = init.newItemDAO;
-
+        networkType = init.networkType;
+        
         subscribe(handleStart, control);
     }
 
@@ -105,7 +108,7 @@ public class HostMngrComp extends ComponentDefinition {
         AppMngrComp.ExtPort extPorts = new AppMngrComp.ExtPort(timerPort, networkPort,
                 overlayMngrComp.getPositive(CroupierPort.class), overlayMngrComp.getPositive(GradientPort.class),
                 overlayMngrComp.getNegative(OverlayViewUpdatePort.class));
-        appMngrComp = create(AppMngrComp.class, new AppMngrComp.Init(extPorts, selfAdr, overlayId, newItemDAO));
+        appMngrComp = create(AppMngrComp.class, new AppMngrComp.Init(extPorts, selfAdr, overlayId, newItemDAO, networkType));
         connect(appMngrComp.getNegative(OverlayMngrPort.class), overlayMngrComp.getPositive(OverlayMngrPort.class), Channel.TWO_WAY);
     }
 
@@ -115,12 +118,15 @@ public class HostMngrComp extends ComponentDefinition {
         public final KAddress bootstrapServer;
         public final Identifier overlayId;
         public final INewsItemDAO newItemDAO;
-
-        public Init(KAddress selfAdr, KAddress bootstrapServer, Identifier overlayId, INewsItemDAO newItemDAO) {
+        public final int networkType;
+        
+        public Init(KAddress selfAdr, KAddress bootstrapServer, Identifier overlayId, 
+        			INewsItemDAO newItemDAO, int networkType) {
             this.selfAdr = selfAdr;
             this.bootstrapServer = bootstrapServer;
             this.overlayId = overlayId;
             this.newItemDAO = newItemDAO;
+            this.networkType = networkType;
         }
     }
 }

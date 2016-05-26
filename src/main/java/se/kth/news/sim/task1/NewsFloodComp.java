@@ -6,6 +6,7 @@ package se.kth.news.sim.task1;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import se.kth.news.core.NewsComponentType;
 import se.kth.news.core.news.data.INewsItemDAO;
 import se.kth.news.core.news.data.NewsItem;
 import se.kth.news.system.HostMngrComp;
@@ -85,7 +86,7 @@ public class NewsFloodComp extends ComponentDefinition {
 	}
 	
 	private void connectHostMngr() {
-		hostMngrComp = create(HostMngrComp.class, new HostMngrComp.Init(selfAdr, bootstrapServer, overlayId, newItemDAO));
+		hostMngrComp = create(HostMngrComp.class, new HostMngrComp.Init(selfAdr, bootstrapServer, overlayId, newItemDAO, NewsComponentType.CROUPIER_NETWORK));
         connect(hostMngrComp.getNegative(Timer.class), timerPort, Channel.TWO_WAY);
         connect(hostMngrComp.getNegative(Network.class), networkPort, Channel.TWO_WAY);
         

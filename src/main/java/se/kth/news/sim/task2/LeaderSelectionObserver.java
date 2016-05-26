@@ -1,15 +1,17 @@
 /**
  * 
  */
-package se.kth.news.sim.task3;
+package se.kth.news.sim.task2;
 
+import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Set;
+import java.util.Map;
 import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import se.kth.news.sim.task1.NewsFloodScenario;
 import se.sics.kompics.ComponentDefinition;
 import se.sics.kompics.Handler;
 import se.sics.kompics.Positive;
@@ -24,14 +26,14 @@ import se.sics.kompics.timer.Timer;
  * @author pradeeppeiris
  *
  */
-public class LeaderDisseminationObserver extends ComponentDefinition {
-	private static final Logger LOG = LoggerFactory.getLogger(LeaderDisseminationObserver.class);
+public class LeaderSelectionObserver extends ComponentDefinition {
+	private static final Logger LOG = LoggerFactory.getLogger(LeaderSelectionObserver.class);
 	Positive<Timer> timer = requires(Timer.class);
 	Positive<Network> network = requires(Network.class);
 	
 	private UUID timerId;
 	 
-	public LeaderDisseminationObserver(Init init) {
+	public LeaderSelectionObserver(Init init) {
 		 subscribe(handleStart, control);
 	     subscribe(handleCheck, timer);
 	}
@@ -55,19 +57,13 @@ public class LeaderDisseminationObserver extends ComponentDefinition {
     Handler<CheckTimeout> handleCheck = new Handler<CheckTimeout>() {
     	@Override
         public void handle(CheckTimeout event) {
-    		showLeaderCoverage();
+    		GlobalView gv = config().getValue("simulation.globalview", GlobalView.class);
+    		if(gv.getValue("simulation.leader_selected", Boolean.class) == true) {
+    			LOG.info("{} is selected as leader", gv.getValue("simulation.leader_id", String.class));
+    			gv.terminate();
+    		}
     	}    		
     };
-    
-    private void showLeaderCoverage() {
-    	GlobalView gv = config().getValue("simulation.globalview", GlobalView.class);
-		int leaderCoverage = gv.getValue("simulation.leader_coverage", HashSet.class).size();
-		if(leaderCoverage == LeaderDisseminationScenario.NUM_NODES) {
-			LOG.info("Leader coverage  in {} messages",  gv.getValue("simulation.num_pulls", Integer.class));
-			gv.terminate();
-		}
-    }
-    
     
     public static class CheckTimeout extends Timeout {
         public CheckTimeout(SchedulePeriodicTimeout spt) {
@@ -75,7 +71,7 @@ public class LeaderDisseminationObserver extends ComponentDefinition {
         }
     }
     
-    public static class Init extends se.sics.kompics.Init<LeaderDisseminationObserver> {
+    public static class Init extends se.sics.kompics.Init<LeaderSelectionObserver> {
 
     	public final boolean flag;
 

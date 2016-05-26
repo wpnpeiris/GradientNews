@@ -20,6 +20,9 @@ package se.kth.news.sim;
 import java.util.HashMap;
 import java.util.Map;
 
+import se.kth.news.core.NewsComponentType;
+import se.kth.news.core.news.NewsComp;
+import se.kth.news.core.news.util.NewsView;
 import se.kth.news.sim.compatibility.SimNodeIdExtractor;
 import se.kth.news.sim.data.NewsItemSimulationDAO;
 import se.kth.news.system.HostMngrComp;
@@ -31,6 +34,7 @@ import se.sics.kompics.simulator.adaptor.distributions.extra.BasicIntSequentialD
 import se.sics.kompics.simulator.events.system.SetupEvent;
 import se.sics.kompics.simulator.events.system.StartNodeEvent;
 import se.sics.kompics.simulator.network.identifier.IdentifierExtractor;
+import se.sics.ktoolbox.croupier.event.CroupierSample;
 import se.sics.ktoolbox.omngr.bootstrap.BootstrapServerComp;
 import se.sics.ktoolbox.util.network.KAddress;
 import se.sics.ktoolbox.util.overlays.id.OverlayIdRegistry;
@@ -109,7 +113,7 @@ public class ScenarioGen {
 
                 @Override
                 public HostMngrComp.Init getComponentInit() {
-                    return new HostMngrComp.Init(selfAdr, ScenarioSetup.bootstrapServer, ScenarioSetup.newsOverlayId, new NewsItemSimulationDAO());
+                    return new HostMngrComp.Init(selfAdr, ScenarioSetup.bootstrapServer, ScenarioSetup.newsOverlayId, new NewsItemSimulationDAO(), NewsComponentType.GRADIENT_NETWORK);
                 }
 
                 @Override

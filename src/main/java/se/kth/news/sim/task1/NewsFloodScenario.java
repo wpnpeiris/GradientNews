@@ -47,7 +47,7 @@ import se.sics.ktoolbox.util.overlays.id.OverlayIdRegistry;
  */
 public class NewsFloodScenario {
 	
-	private static final int NUM_NODES = 500;
+	private static final int NUM_NODES = 100;
 	public static final int NUM_MESSAGES = 5;
 
     static Operation<SetupEvent> systemSetupOp = new Operation<SetupEvent>() {

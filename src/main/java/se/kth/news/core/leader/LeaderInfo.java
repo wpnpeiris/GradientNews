@@ -22,10 +22,10 @@ import se.sics.ktoolbox.util.network.KAddress;
 /**
  * @author Alex Ormenisan <aaor@kth.se>
  */
-public class LeaderNotification {
+public class LeaderInfo {
     public final KAddress leaderAdr;
     
-    public LeaderNotification(KAddress leaderAdr) {
+    public LeaderInfo(KAddress leaderAdr) {
         this.leaderAdr = leaderAdr;
     }
 }

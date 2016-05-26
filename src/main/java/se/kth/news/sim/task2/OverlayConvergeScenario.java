@@ -24,8 +24,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
+import se.kth.news.core.NewsComponentType;
+import se.kth.news.core.news.NewsComp;
 import se.kth.news.core.news.data.INewsItemDAO;
 import se.kth.news.core.news.data.NewsItem;
+import se.kth.news.core.news.util.NewsView;
+import se.kth.news.sim.GlobalViewControler;
 import se.kth.news.sim.ScenarioSetup;
 import se.kth.news.sim.compatibility.SimNodeIdExtractor;
 import se.kth.news.sim.task1.NewsFloodObserver;
@@ -42,6 +46,7 @@ import se.sics.kompics.simulator.events.system.StartNodeEvent;
 import se.sics.kompics.simulator.network.identifier.IdentifierExtractor;
 import se.sics.kompics.simulator.run.LauncherComp;
 import se.sics.kompics.simulator.util.GlobalView;
+import se.sics.ktoolbox.croupier.event.CroupierSample;
 import se.sics.ktoolbox.omngr.bootstrap.BootstrapServerComp;
 import se.sics.ktoolbox.util.network.KAddress;
 import se.sics.ktoolbox.util.overlays.id.OverlayIdRegistry;
@@ -68,8 +73,7 @@ public class OverlayConvergeScenario {
                 
                 @Override
 				public void setupGlobalView(GlobalView gv) {
-                	gv.setValue("simulation.converge_node_count", 0);
-					gv.setValue("simulation.converge_rounds", new HashMap<String, Integer>());
+                	GlobalViewControler.getInstance().setupGlobalView(gv);
 				}
             };
         }
@@ -197,7 +201,7 @@ public class OverlayConvergeScenario {
 //                    		return count;
                     		return numNews;
                     	}
-                    });
+                    }, NewsComponentType.GRADIENT_NETWORK);
                 }
 
                 @Override

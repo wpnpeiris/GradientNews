@@ -99,6 +99,7 @@ public class LeaderSelectComp extends ComponentDefinition {
     	int newsCount = newItemDAO.size();
         localNewsView = new NewsView(selfAdr.getId(), newsCount);
     }
+    
     Handler handleStart = new Handler<Start>() {
         @Override
         public void handle(Start event) {
