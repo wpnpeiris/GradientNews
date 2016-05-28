@@ -25,15 +25,22 @@ import se.sics.kompics.timer.Timer;
  *
  */
 public class LeaderDisseminationObserver extends ComponentDefinition {
+	public static final int PUSH_MODE = 1;
+	public static final int PULL_MODE = 2;
 	private static final Logger LOG = LoggerFactory.getLogger(LeaderDisseminationObserver.class);
+	
+	
 	Positive<Timer> timer = requires(Timer.class);
 	Positive<Network> network = requires(Network.class);
 	
 	private UUID timerId;
+	
+	private int mode;
 	 
 	public LeaderDisseminationObserver(Init init) {
-		 subscribe(handleStart, control);
-	     subscribe(handleCheck, timer);
+		mode = init.mode;
+		subscribe(handleStart, control);
+	    subscribe(handleCheck, timer);
 	}
 	
 	Handler<Start> handleStart = new Handler<Start>() {
@@ -62,10 +69,20 @@ public class LeaderDisseminationObserver extends ComponentDefinition {
     private void showLeaderCoverage() {
     	GlobalView gv = config().getValue("simulation.globalview", GlobalView.class);
 		int leaderCoverage = gv.getValue("simulation.leader_coverage", HashSet.class).size();
-		if(leaderCoverage == LeaderDisseminationScenario.NUM_NODES) {
-			LOG.info("Leader coverage  in {} messages",  gv.getValue("simulation.num_pulls", Integer.class));
-			gv.terminate();
+		
+		
+		if(mode == PULL_MODE) {
+			if(leaderCoverage == LeaderDisseminationScenario.NUM_NODES) {
+				LOG.info("Leader coverage  in {} messages",  gv.getValue("simulation.num_pulls", Integer.class));
+				gv.terminate();
+			}
+		} else if(mode == PUSH_MODE) {
+			if(leaderCoverage >= (LeaderDisseminationScenario.NUM_NODES * 0.6)) {
+				LOG.info("Leader coverage  in {} messages",  gv.getValue("simulation.num_pushes", Integer.class));
+				gv.terminate();
+			}
 		}
+		
     }
     
     
@@ -77,10 +94,10 @@ public class LeaderDisseminationObserver extends ComponentDefinition {
     
     public static class Init extends se.sics.kompics.Init<LeaderDisseminationObserver> {
 
-    	public final boolean flag;
+    	public final int mode;
 
-        public Init(boolean flag) {
-        	this.flag = flag;
+        public Init(int mode) {
+        	this.mode = mode;
         }
     }
 }

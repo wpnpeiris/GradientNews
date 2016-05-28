@@ -36,8 +36,15 @@ public class GlobalViewControler {
     	gv.setValue("simulation.converge_node_count", 0);
 		gv.setValue("simulation.converge_rounds", new HashMap<String, Integer>());
 		
+		gv.setValue("simulation.num_pushes", 0);
     	gv.setValue("simulation.num_pulls", 0);
 		gv.setValue("simulation.leader_coverage", new HashSet<String>());
+		
+		
+    	gv.setValue("simulation.num_messages", 0);
+		gv.setValue("simulation.news_coverage", new HashSet<String>());
+		gv.setValue("simulation.node_knowlege", new HashMap<String, Integer>());
+		
 	}
 	
 	public void updateLeaderSection(GlobalView gv, String leaderId) {
@@ -63,6 +70,10 @@ public class GlobalViewControler {
 	
 	public void updateGlobalLeaderPullNotificationView(GlobalView gv){
 		gv.setValue("simulation.num_pulls", gv.getValue("simulation.num_pulls", Integer.class) + 1);
+	}
+	
+	public void updateGlobalLeaderPushNotificationView(GlobalView gv){
+		gv.setValue("simulation.num_pushes", gv.getValue("simulation.num_pushes", Integer.class) + 1);
 	}
 	
 	public void updateGlobalLeaderDisseminationView(GlobalView gv, String nodeId) {

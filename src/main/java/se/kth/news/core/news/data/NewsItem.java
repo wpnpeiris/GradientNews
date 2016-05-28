@@ -16,11 +16,17 @@ public class NewsItem {
 	
 	private int ttl;
 
+	public NewsItem(String id, String news) {
+		this.id = id;
+		this.news = news;
+	}
+	
 	public NewsItem(String id, String news, int ttl) {
 		this.id = id;
 		this.news = news;
 		this.ttl = ttl;
 	}
+	
 	
 	
 	public String getId() {

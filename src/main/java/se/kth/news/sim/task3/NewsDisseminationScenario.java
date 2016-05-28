@@ -19,21 +19,16 @@ package se.kth.news.sim.task3;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
 import se.kth.news.core.NewsComponentType;
-import se.kth.news.core.news.NewsComp;
 import se.kth.news.core.news.data.INewsItemDAO;
 import se.kth.news.core.news.data.NewsItem;
-import se.kth.news.core.news.util.NewsView;
 import se.kth.news.sim.GlobalViewControler;
 import se.kth.news.sim.ScenarioSetup;
 import se.kth.news.sim.compatibility.SimNodeIdExtractor;
-import se.kth.news.sim.task1.NewsFloodObserver;
-import se.kth.news.system.HostMngrComp;
 import se.sics.kompics.Init;
 import se.sics.kompics.network.Address;
 import se.sics.kompics.simulator.SimulationScenario;
@@ -46,7 +41,6 @@ import se.sics.kompics.simulator.events.system.StartNodeEvent;
 import se.sics.kompics.simulator.network.identifier.IdentifierExtractor;
 import se.sics.kompics.simulator.run.LauncherComp;
 import se.sics.kompics.simulator.util.GlobalView;
-import se.sics.ktoolbox.croupier.event.CroupierSample;
 import se.sics.ktoolbox.omngr.bootstrap.BootstrapServerComp;
 import se.sics.ktoolbox.util.network.KAddress;
 import se.sics.ktoolbox.util.overlays.id.OverlayIdRegistry;
@@ -54,8 +48,8 @@ import se.sics.ktoolbox.util.overlays.id.OverlayIdRegistry;
 /**
  * @author Alex Ormenisan <aaor@kth.se>
  */
-public class LeaderDisseminationScenario {
-	protected static final int NUM_NODES = 500;
+public class NewsDisseminationScenario {
+	protected static final int NUM_NODES = 100;
 	
     static Operation<SetupEvent> systemSetupOp = new Operation<SetupEvent>() {
         @Override
@@ -92,7 +86,7 @@ public class LeaderDisseminationScenario {
                 @Override
                 public Map<String, Object> initConfigUpdate() {
                     HashMap<String, Object> config = new HashMap<>();
-                    config.put("newsflood.simulation.checktimeout", 2000);
+                    config.put("newsgradient.simulation.checktimeout", 2000);
                     return config;
                 }
                 
@@ -103,12 +97,12 @@ public class LeaderDisseminationScenario {
 
                 @Override
                 public Class getComponentDefinition() {
-                    return LeaderDisseminationObserver.class;
+                    return NewsDisseminationObserver.class;
                 }
                 
                 @Override
                 public Init getComponentInit() {
-                    return new LeaderDisseminationObserver.Init(LeaderDisseminationObserver.PULL_MODE);
+                    return new NewsDisseminationObserver.Init(true);
                 }
 			};
 		}
@@ -161,31 +155,34 @@ public class LeaderDisseminationScenario {
 
                 @Override
                 public Class getComponentDefinition() {
-                    return HostMngrComp.class;
+                    return NewsGradientClientComp.class;
                 }
 
                 @Override
-                public HostMngrComp.Init getComponentInit() {
-                    return new HostMngrComp.Init(selfAdr, ScenarioSetup.bootstrapServer, ScenarioSetup.newsOverlayId, new INewsItemDAO() {
+                public NewsGradientClientComp.Init getComponentInit() {
+                    return new NewsGradientClientComp.Init(selfAdr, ScenarioSetup.bootstrapServer, ScenarioSetup.newsOverlayId, new INewsItemDAO() {
+                    	private Map<String, NewsItem> data =  new HashMap<String, NewsItem>();
+                    	
                     	public void save(NewsItem newsItem) {
+                    		data.put(newsItem.getId(), newsItem);
                     	}
 
                     	public NewsItem get(String id) {
-                    		return new NewsItem(id, "Test News", 7);
+                    		return null;
                     	}
                     	
                     	public List<NewsItem> getAll() {
-                    		return new ArrayList<NewsItem>();
+                    		return new ArrayList<NewsItem>(data.values());
+                    	}
+                    	
+                    	public boolean cotains(NewsItem newsItem) {
+                    		return data.containsKey(newsItem.getId());
                     	}
                     	
                     	public boolean isEmpty() {
                     		return false;
                     	}
                     	
-                    	public boolean cotains(NewsItem newsItem) {
-                    		return false;
-                    		
-                    	}
                     	
                     	public int size() {
 //                    		Assume number of news items varies according to node id
@@ -201,7 +198,7 @@ public class LeaderDisseminationScenario {
                     		
                     		return count;
                     	}
-                    }, NewsComponentType.GRADIENT_NETWORK);
+                    }, nodeId == 1 ? true : false);
                 }
 
                 @Override
@@ -256,7 +253,7 @@ public class LeaderDisseminationScenario {
     
     public static void main(String[] args) {
         SimulationScenario.setSeed(ScenarioSetup.scenarioSeed);
-        SimulationScenario simpleBootScenario = LeaderDisseminationScenario.scenario1();
+        SimulationScenario simpleBootScenario = NewsDisseminationScenario.scenario1();
         simpleBootScenario.simulate(LauncherComp.class);
     }
 }

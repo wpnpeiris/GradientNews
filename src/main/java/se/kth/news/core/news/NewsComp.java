@@ -79,8 +79,6 @@ public class NewsComp extends ComponentDefinition {
         subscribe(handleStart, control);
         subscribe(handlePing, networkPort);
         subscribe(handlePong, networkPort);
-        
-//        subscribe(handleLeaderPushNotification, networkPort);
     }
 
     
@@ -99,33 +97,6 @@ public class NewsComp extends ComponentDefinition {
         LOG.debug("{}informing overlays of new view", logPrefix);
         trigger(new OverlayViewUpdate.Indication<>(gradientOId, false, localNewsView.copy()), viewUpdatePort);
     }
-    
-//    private void disseminateLeaderInfo(TGradientSample sample) {
-//    	StringBuffer sb = new StringBuffer();
-//    	for(Object obj: sample.gradientFingers) {
-//			Container<KAddress, NewsView> neighbour = (Container<KAddress, NewsView>) obj;
-//			KAddress neighbourAddr = neighbour.getSource();
-//			KHeader header = new BasicHeader(selfAdr, neighbourAddr, Transport.UDP);
-//    		KContentMsg msg = new BasicContentMsg(header, new LeaderPushNotification(leader));
-//    		trigger(msg, networkPort);
-//    		sb.append(neighbourAddr.getId()).append(", ");
-//		}
-//
-//    }
-    
-     
-    ClassMatchedHandler handleLeaderPushNotification = new ClassMatchedHandler<LeaderPushNotification, KContentMsg<?, ?, LeaderPushNotification>>() {
-
-        @Override
-        public void handle(LeaderPushNotification content, KContentMsg<?, ?, LeaderPushNotification> container) {
-            if(leader == null) {
-            	LOG.info("{} XXXX received LeaderUpdate at:{} from:{}", logPrefix, selfAdr, container.getHeader().getSource());
-            	leader = content.leaderAdr;
-//            	updateGlobalLeaderDisseminationView();
-            }
-        }
-    };
-    
     
     ClassMatchedHandler handlePing
             = new ClassMatchedHandler<Ping, KContentMsg<?, ?, Ping>>() {

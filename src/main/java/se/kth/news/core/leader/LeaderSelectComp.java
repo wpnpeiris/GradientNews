@@ -161,7 +161,7 @@ public class LeaderSelectComp extends ComponentDefinition {
 
         @Override
         public void handle(Election content, KContentMsg<?, ?, Election> container) {
-            LOG.info("{} received Election message at:{} from:{}", logPrefix, selfAdr, container.getHeader().getSource());
+            LOG.debug("{} received Election message at:{} from:{}", logPrefix, selfAdr, container.getHeader().getSource());
             if(Integer.valueOf(selfAdr.getId().toString()) >= Integer.valueOf(container.getHeader().getSource().getId().toString())){
 	            if(localNewsView.localNewsCount >= content.getUtility()) {
 	            		trigger(container.answer(new ElectionAck()), networkPort);		
@@ -174,7 +174,7 @@ public class LeaderSelectComp extends ComponentDefinition {
 
         @Override
         public void handle(InitElection content, KContentMsg<?, ?, InitElection> container) {
-            LOG.info("{} received InitElection at:{} ", logPrefix, selfAdr);
+            LOG.debug("{} received InitElection at:{} ", logPrefix, selfAdr);
             callElection = true;
         }
     };
@@ -183,7 +183,7 @@ public class LeaderSelectComp extends ComponentDefinition {
 
         @Override
         public void handle(ElectionAck content, KContentMsg<?, ?, ElectionAck> container) {
-            LOG.info("{} received LeaderAck at:{} from:{}", logPrefix, selfAdr, container.getHeader().getSource());
+            LOG.debug("{} received LeaderAck at:{} from:{}", logPrefix, selfAdr, container.getHeader().getSource());
             acks.add(content);
         }
     };
