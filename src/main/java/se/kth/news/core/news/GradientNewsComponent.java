@@ -9,21 +9,28 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import se.kth.news.core.leader.HearbeatRequest;
+import se.kth.news.core.leader.HearbeatResponse;
 import se.kth.news.core.leader.InitElection;
+import se.kth.news.core.leader.LeaderEligable;
 import se.kth.news.core.leader.LeaderInfo;
 import se.kth.news.core.leader.LeaderPullNotification;
 import se.kth.news.core.leader.LeaderPushNotification;
 import se.kth.news.core.leader.LeaderUpdate;
 import se.kth.news.core.leader.NewsItemInfo;
 import se.kth.news.core.leader.NewsPullNotification;
+import se.kth.news.core.leader.LeaderSelectComp.ElectionTimeout;
 import se.kth.news.core.news.data.INewsItemDAO;
 import se.kth.news.core.news.data.NewsItem;
 import se.kth.news.core.news.util.NewsView;
 import se.kth.news.sim.GlobalViewControler;
 import se.sics.kompics.ClassMatchedHandler;
 import se.sics.kompics.Handler;
+import se.sics.kompics.Start;
 import se.sics.kompics.network.Transport;
 import se.sics.kompics.simulator.util.GlobalView;
+import se.sics.kompics.timer.ScheduleTimeout;
+import se.sics.kompics.timer.Timeout;
 import se.sics.ktoolbox.gradient.event.TGradientSample;
 import se.sics.ktoolbox.util.identifiable.Identifier;
 import se.sics.ktoolbox.util.network.KAddress;
@@ -32,6 +39,7 @@ import se.sics.ktoolbox.util.network.KHeader;
 import se.sics.ktoolbox.util.network.basic.BasicContentMsg;
 import se.sics.ktoolbox.util.network.basic.BasicHeader;
 import se.sics.ktoolbox.util.other.Container;
+import se.sics.ktoolbox.util.overlays.view.OverlayViewUpdate;
 
 /**
  * @author pradeeppeiris
@@ -47,14 +55,21 @@ public class GradientNewsComponent extends NewsComp {
     private int gradientRoundFlag = 0;
     private boolean gradientStable = false;
     
+    protected KAddress leader;
+    private boolean isLeader = false;
+    private boolean eligableForLeader = false;
+    private boolean leaderLive = false;
+    
     private List<NewsItem> stagNewsItems = new ArrayList<NewsItem>();
     
     public GradientNewsComponent(Init init) {
     	super(new NewsComp.Init(init.selfAdr, init.gradientOId, init.newItemDAO));
     	
     	
-    	subscribe(handleGradientSample, gradientPort);
+    	subscribe(handleStart, control);
+        subscribe(handleGradientSample, gradientPort);
     	subscribe(handleLeader, leaderPort);
+    	subscribe(handleLeaderEligable, leaderEligablePort);
     	subscribe(handleLeaderPullNotification, networkPort);
     	subscribe(handleLeaderPushNotification, networkPort);
     	subscribe(handleLeaderInfo, networkPort);
@@ -62,7 +77,29 @@ public class GradientNewsComponent extends NewsComp {
     	subscribe(handleNewsPullNotification, networkPort);
     	subscribe(newsItemInfo, networkPort);
     	
+    	subscribe(handleHearbeatRequest, networkPort);
+    	subscribe(handleHearbeatResponse, networkPort);
+    	subscribe(leaderDetectorHandler, timerPort);
     	
+    	
+    	
+    }
+    
+    Handler handleStart = new Handler<Start>() {
+        @Override
+        public void handle(Start event) {
+            LOG.info("{}starting...", logPrefix);
+            updateLocalNewsView();
+            
+        }
+    };
+
+    private void updateLocalNewsView() {
+    	int newsCount = newItemDAO.size();
+    	
+        localNewsView = new NewsView(selfAdr.getId(), newsCount);
+        LOG.debug("{}informing overlays of new view", logPrefix);
+        trigger(new OverlayViewUpdate.Indication<>(gradientOId, false, localNewsView.copy()), viewUpdatePort);
     }
     
     Handler handleGradientSample = new Handler<TGradientSample>() {
@@ -130,15 +167,7 @@ public class GradientNewsComponent extends NewsComp {
 		}
 	}
 	
-    Handler handleLeader = new Handler<LeaderUpdate>() {
-        @Override
-        public void handle(LeaderUpdate event) {
-        	LOG.info("{} Elected Leader {}", logPrefix, selfAdr);
-        	GlobalViewControler.getInstance().updateLeaderSection(config().getValue("simulation.globalview", GlobalView.class),  selfAdr.getId().toString());
     
-        	leader = selfAdr;
-        }
-    };
     
     private void checkGradientStablity(TGradientSample sample) {
     	String latestNeighbourIdList = createNeighbourIdList(sample);
@@ -221,15 +250,34 @@ public class GradientNewsComponent extends NewsComp {
     ClassMatchedHandler newsItemInfo = new ClassMatchedHandler<NewsItemInfo, KContentMsg<?, ?, NewsItemInfo>>() {
         @Override
         public void handle(NewsItemInfo newsItemInfo, KContentMsg<?, ?, NewsItemInfo> container) {
-            LOG.info("{} XXXXXXXXX received NewsItemInfo :{} from{}  at{}", logPrefix, newsItemInfo.news, container.getHeader().getSource(), selfAdr);
+            LOG.debug("{} received NewsItemInfo :{} from{}  at{}", logPrefix, newsItemInfo.news, container.getHeader().getSource(), selfAdr);
+            GlobalViewControler.getInstance().updateGlobalNumMessagesView(config().getValue("simulation.globalview", GlobalView.class));
             for(NewsItem newsItem : newsItemInfo.news) {
             	newItemDAO.save(newsItem);
             }
-//            leader = leaderInfo.leaderAdr;
-//            GlobalViewControler.getInstance().updateGlobalLeaderDisseminationView(config().getValue("simulation.globalview", GlobalView.class), selfAdr.getId().toString());
+            GlobalViewControler.getInstance().updateGlobalNodeKnowlegeView(config().getValue("simulation.globalview", GlobalView.class), selfAdr.getId().toString(), newItemDAO.getDataSize());
+            GlobalViewControler.getInstance().updateGlobalNewsCoverageView(config().getValue("simulation.globalview", GlobalView.class), selfAdr.getId().toString());
+            
         }
     };
     
+    ClassMatchedHandler handleNewsItem = new ClassMatchedHandler<NewsItem, KContentMsg<?, ?, NewsItem>>() {
+		@Override
+		public void handle(NewsItem newsItem, KContentMsg<?, ?, NewsItem> container) {
+			LOG.info("{} received NewsItem at{} from:{}", logPrefix, selfAdr, container.getHeader().getSource());
+			GlobalViewControler.getInstance().updateGlobalNumMessagesView(config().getValue("simulation.globalview", GlobalView.class));
+			if (newItemDAO.cotains(newsItem)) {
+				LOG.debug("{} received {} already exists", logPrefix, newsItem);
+			} else {
+				newItemDAO.save(newsItem);
+				stagNewsItems.add(newsItem);
+				GlobalViewControler.getInstance().updateGlobalNewsCoverageView(config().getValue("simulation.globalview", GlobalView.class), selfAdr.getId().toString());
+				GlobalViewControler.getInstance().updateGlobalNodeKnowlegeView(config().getValue("simulation.globalview", GlobalView.class), selfAdr.getId().toString(), newItemDAO.getDataSize());
+			}
+
+		}
+	};
+	
 	ClassMatchedHandler handleLeaderPullNotification = new ClassMatchedHandler<LeaderPullNotification, KContentMsg<?, ?, LeaderPullNotification>>() {
 
         @Override
@@ -246,29 +294,94 @@ public class GradientNewsComponent extends NewsComp {
         @Override
         public void handle(LeaderInfo leaderInfo, KContentMsg<?, ?, LeaderInfo> container) {
             LOG.debug("{} received LeaderInfo :{} ", logPrefix, leaderInfo.leaderAdr);
-            
             leader = leaderInfo.leaderAdr;
+            leaderLive = true;
+            
             GlobalViewControler.getInstance().updateGlobalLeaderDisseminationView(config().getValue("simulation.globalview", GlobalView.class), selfAdr.getId().toString());
         }
     };
     
-    ClassMatchedHandler handleNewsItem = new ClassMatchedHandler<NewsItem, KContentMsg<?, ?, NewsItem>>() {
-
-		@Override
-		public void handle(NewsItem newsItem, KContentMsg<?, ?, NewsItem> container) {
-			LOG.info("{} received NewsItem at{} from:{}", logPrefix, selfAdr, container.getHeader().getSource());
-//			updateGlobalNumMessagesView();
-			if (newItemDAO.cotains(newsItem)) {
-				LOG.debug("{} received {} already exists", logPrefix, newsItem);
+//    private void startDetectingLeader(KAddress detectLeader) {
+//    	if(eligableForLeader && (leader == null || !detectLeader.equals(leader))) {
+//    		LOG.info("{} Start detecting leader {} at:{}", logPrefix, detectLeader, selfAdr);
+//    		KHeader header = new BasicHeader(selfAdr, detectLeader, Transport.UDP);
+//    		KContentMsg msg = new BasicContentMsg(header, new HearbeatRequest());
+//    		trigger(msg, networkPort);
+//    		leaderLive = false;
+//    		
+//    		startLeaderDetectorTimer();
+//    	}
+//    }
+    
+    Handler handleLeader = new Handler<LeaderUpdate>() {
+        @Override
+        public void handle(LeaderUpdate event) {
+        	LOG.info("{} Elected Leader {}", logPrefix, selfAdr);
+        	GlobalViewControler.getInstance().updateLeaderSection(config().getValue("simulation.globalview", GlobalView.class),  selfAdr);
+        	leader = selfAdr;
+        	isLeader = true;
+        }
+    };
+    
+    Handler handleLeaderEligable = new Handler<LeaderEligable>() {
+        @Override
+        public void handle(LeaderEligable event) {
+        	LOG.info("{} Eligable Leader {}", logPrefix, selfAdr);
+        	eligableForLeader = true;
+        	startLeaderDetectorTimer();
+        }
+    };
+    
+    private void startLeaderDetectorTimer() {
+    	ScheduleTimeout spt = new ScheduleTimeout(5000);
+    	LeaderDetectorTimeout timeout = new LeaderDetectorTimeout(spt);
+		spt.setTimeoutEvent(timeout);
+		trigger(spt, timerPort);
+    }
+    
+    Handler<LeaderDetectorTimeout> leaderDetectorHandler = new Handler<LeaderDetectorTimeout>() {
+		public void handle(LeaderDetectorTimeout event) {
+			
+			if(leader == null) {
+				startLeaderDetectorTimer();
+				return;
+			} 
+			
+			if(leaderLive) {
+				LOG.debug("{} Send HearbeatRequest to leader :{} from:{}", logPrefix, leader, selfAdr);
+				KHeader header = new BasicHeader(selfAdr, leader, Transport.UDP);
+	    		KContentMsg msg = new BasicContentMsg(header, new HearbeatRequest());
+	    		trigger(msg, networkPort);
+	    		leaderLive = false;
+	    		
+	    		LOG.debug("{} Start leader detection timer :{}", logPrefix, selfAdr);
+	    		startLeaderDetectorTimer();
 			} else {
-				newItemDAO.save(newsItem);
-				stagNewsItems.add(newsItem);
-//				updateGlobalNewsCoverageView();
-//				updateGlobalNodeKnowlegeView();
+				LOG.info("{} Detect leader failure at :{} and initiate election", logPrefix, selfAdr);
 			}
-
 		}
 	};
+	
+    ClassMatchedHandler handleHearbeatRequest = new ClassMatchedHandler<HearbeatRequest, KContentMsg<?, ?, HearbeatRequest>>() {
+
+        @Override
+        public void handle(HearbeatRequest content, KContentMsg<?, ?, HearbeatRequest> container) {
+            LOG.debug("{} received HearbeatRequest message at:{} from:{}", logPrefix, selfAdr, container.getHeader().getSource());
+            trigger(container.answer(new HearbeatResponse()), networkPort);		
+        }
+    };
+    
+    ClassMatchedHandler handleHearbeatResponse = new ClassMatchedHandler<HearbeatResponse, KContentMsg<?, ?, HearbeatResponse>>() {
+
+        @Override
+        public void handle(HearbeatResponse content, KContentMsg<?, ?, HearbeatResponse> container) {
+            LOG.debug("{} received HearbeatResponse message at:{} from:{}", logPrefix, selfAdr, container.getHeader().getSource());
+            leaderLive = true;	
+        }
+    };
+    
+    
+
 		
 		
 	public static class Init extends se.sics.kompics.Init<GradientNewsComponent> {
@@ -284,4 +397,9 @@ public class GradientNewsComponent extends NewsComp {
         }
     }
 	
+	public static class LeaderDetectorTimeout extends Timeout {
+		public LeaderDetectorTimeout(ScheduleTimeout spt) {
+			super(spt);
+		}
+	}
 }

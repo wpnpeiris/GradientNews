@@ -56,7 +56,7 @@ public class NewsDisseminationObserver extends ComponentDefinition {
     Handler<CheckTimeout> handleCheck = new Handler<CheckTimeout>() {
     	@Override
         public void handle(CheckTimeout event) {
-    		showNewsCoverage();
+//    		showNewsCoverage();
     		calculateNodeKnowledge();
     	}    		
     };
@@ -65,14 +65,18 @@ public class NewsDisseminationObserver extends ComponentDefinition {
     	GlobalView gv = config().getValue("simulation.globalview", GlobalView.class);
 		int newsCoverage = gv.getValue("simulation.news_coverage", HashSet.class).size();
 		int numNodes = NewsDisseminationScenario.NUM_NODES;
-		double percentage = ((newsCoverage * 1.0) / numNodes) * 100;
-		LOG.debug("Node coverage " + gv.getValue("simulation.news_coverage", HashSet.class).size() + 
-				" , Percentage: " + percentage + " , Total Messages: " + gv.getValue("simulation.num_messages", Integer.class));
+//		double percentage = ((newsCoverage * 1.0) / numNodes) * 100;
+		if(newsCoverage == numNodes) {
+			LOG.info("Node coverage " + gv.getValue("simulation.news_coverage", HashSet.class).size() + 
+					" , Total Messages: " + gv.getValue("simulation.num_messages", Integer.class));
+			gv.terminate();
+		}
+		
     }
     
     private void calculateNodeKnowledge() {
     	GlobalView gv = config().getValue("simulation.globalview", GlobalView.class);
-    	int[] nodeKnwowlge = new int[NewsDisseminationScenario.NUM_NODES + 1];
+    	int[] nodeKnwowlge = new int[NewsDisseminationScenario.NUM_MESSAGES + 1];
     	Map<String, Integer> data = gv.getValue("simulation.node_knowlege", HashMap.class);
     	for(int numMsgs : data.values()) {
     		nodeKnwowlge[numMsgs] ++;
@@ -83,7 +87,12 @@ public class NewsDisseminationObserver extends ComponentDefinition {
     		sb.append(i).append(" Messages Node:").append(nodeKnwowlge[i]).append(" | ");
     	}
     	
-    	LOG.debug("Node knowlwge (" + sb.toString() + " )");
+    	LOG.info("Node knowlwge (" + sb.toString() + " )");
+    	if(nodeKnwowlge[NewsDisseminationScenario.NUM_MESSAGES] == NewsDisseminationScenario.NUM_NODES){	
+    		LOG.info(" Total Messages: " + gv.getValue("simulation.num_messages", Integer.class));
+    		gv.terminate();
+    	}
+    	
     	
     }
     

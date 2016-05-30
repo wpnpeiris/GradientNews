@@ -187,6 +187,10 @@ public class LeaderDisseminationScenario {
                     		
                     	}
                     	
+                    	public int getDataSize() {
+                    		return 0;
+                    	}
+                    	
                     	public int size() {
 //                    		Assume number of news items varies according to node id
 //                    		i.e. node 10-20 has 10 news items, node 20-30 has 20 items, etc

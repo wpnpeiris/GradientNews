@@ -22,4 +22,6 @@ public interface INewsItemDAO {
 	public boolean cotains(NewsItem newsItem);
 	
 	public int size();
+	
+	public int getDataSize();
 }

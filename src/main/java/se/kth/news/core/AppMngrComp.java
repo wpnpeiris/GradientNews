@@ -20,11 +20,11 @@ package se.kth.news.core;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import se.kth.news.core.leader.LeaderEligablePort;
 import se.kth.news.core.leader.LeaderSelectComp;
 import se.kth.news.core.leader.LeaderSelectPort;
 import se.kth.news.core.news.CroupierNewsComp;
 import se.kth.news.core.news.GradientNewsComponent;
-import se.kth.news.core.news.NewsComp;
 import se.kth.news.core.news.data.INewsItemDAO;
 import se.kth.news.core.news.util.NewsViewComparator;
 import se.kth.news.core.news.util.NewsViewGradientFilter;
@@ -126,6 +126,7 @@ public class AppMngrComp extends ComponentDefinition {
         connect(newsComp.getNegative(CroupierPort.class), extPorts.croupierPort, Channel.TWO_WAY);
         connect(newsComp.getNegative(GradientPort.class), extPorts.gradientPort, Channel.TWO_WAY);
         connect(newsComp.getNegative(LeaderSelectPort.class), leaderSelectComp.getPositive(LeaderSelectPort.class), Channel.TWO_WAY);
+        connect(newsComp.getNegative(LeaderEligablePort.class), leaderSelectComp.getPositive(LeaderEligablePort.class), Channel.TWO_WAY);
         connect(newsComp.getPositive(OverlayViewUpdatePort.class), extPorts.viewUpdatePort, Channel.TWO_WAY);
     }
 

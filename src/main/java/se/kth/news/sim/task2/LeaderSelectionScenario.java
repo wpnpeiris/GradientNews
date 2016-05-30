@@ -185,15 +185,19 @@ public class LeaderSelectionScenario {
                     		
                     	}
                     	
+                    	public int getDataSize() {
+                    		return 0;
+                    	}
+                    	
                     	public int size() {
 //                    		Assume number of news items varies according to node id
 //                    		i.e. node 12 has 10 news items, node 22 has 20 items, etc
 //                    		System.out.println(">>>> " + numNews);
                     		int count = 0;
-                    		if(Integer.valueOf(selfAdr.getId().toString()) < 90) {
+                    		if(Integer.valueOf(selfAdr.getId().toString()) < (NUM_NODES -10)) {
                     			count = (Integer.valueOf(selfAdr.getId().toString()) / 10) * 10;
                     		} else {
-                    			count = 90 + numNews;
+                    			count = (NUM_NODES - 10) + numNews;
                     		}
                     		
                     		return count;

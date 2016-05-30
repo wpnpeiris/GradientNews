@@ -49,7 +49,8 @@ import se.sics.ktoolbox.util.overlays.id.OverlayIdRegistry;
  * @author Alex Ormenisan <aaor@kth.se>
  */
 public class NewsDisseminationScenario {
-	protected static final int NUM_NODES = 100;
+	protected static final int NUM_NODES = 500;
+	public static final int NUM_MESSAGES = 5;
 	
     static Operation<SetupEvent> systemSetupOp = new Operation<SetupEvent>() {
         @Override
@@ -161,7 +162,7 @@ public class NewsDisseminationScenario {
                 @Override
                 public NewsGradientClientComp.Init getComponentInit() {
                     return new NewsGradientClientComp.Init(selfAdr, ScenarioSetup.bootstrapServer, ScenarioSetup.newsOverlayId, new INewsItemDAO() {
-                    	private Map<String, NewsItem> data =  new HashMap<String, NewsItem>();
+                    	public Map<String, NewsItem> data =  new HashMap<String, NewsItem>();
                     	
                     	public void save(NewsItem newsItem) {
                     		data.put(newsItem.getId(), newsItem);
@@ -183,6 +184,9 @@ public class NewsDisseminationScenario {
                     		return false;
                     	}
                     	
+                    	public int getDataSize(){
+                    		return data.size();
+                    	}
                     	
                     	public int size() {
 //                    		Assume number of news items varies according to node id
@@ -198,7 +202,7 @@ public class NewsDisseminationScenario {
                     		
                     		return count;
                     	}
-                    }, nodeId == 1 ? true : false);
+                    }, nodeId > (NUM_NODES - NUM_MESSAGES) ? true : false);
                 }
 
                 @Override

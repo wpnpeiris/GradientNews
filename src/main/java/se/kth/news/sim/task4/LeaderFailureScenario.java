@@ -15,11 +15,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  */
-package se.kth.news.sim.task2;
+package se.kth.news.sim.task4;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -32,7 +31,6 @@ import se.kth.news.core.news.util.NewsView;
 import se.kth.news.sim.GlobalViewControler;
 import se.kth.news.sim.ScenarioSetup;
 import se.kth.news.sim.compatibility.SimNodeIdExtractor;
-import se.kth.news.sim.task1.NewsFloodObserver;
 import se.kth.news.system.HostMngrComp;
 import se.sics.kompics.Init;
 import se.sics.kompics.network.Address;
@@ -54,8 +52,8 @@ import se.sics.ktoolbox.util.overlays.id.OverlayIdRegistry;
 /**
  * @author Alex Ormenisan <aaor@kth.se>
  */
-public class OverlayConvergeScenario {
-	public static final int NUM_NODES = 500;
+public class LeaderFailureScenario {
+	private static final int NUM_NODES = 100;
 	
     static Operation<SetupEvent> systemSetupOp = new Operation<SetupEvent>() {
         @Override
@@ -78,7 +76,7 @@ public class OverlayConvergeScenario {
             };
         }
     };
-    
+
     static Operation startObserverOp = new Operation<StartNodeEvent>() {
 		@Override
         public StartNodeEvent generate() {
@@ -103,17 +101,17 @@ public class OverlayConvergeScenario {
 
                 @Override
                 public Class getComponentDefinition() {
-                    return OverlayConvergeObserver.class;
+                    return LeaderFailureObserver.class;
                 }
                 
                 @Override
                 public Init getComponentInit() {
-                    return new OverlayConvergeObserver.Init(true);
+                    return new LeaderFailureObserver.Init(true);
                 }
 			};
 		}
 	};
-
+	
     static Operation<StartNodeEvent> startBootstrapServerOp = new Operation<StartNodeEvent>() {
 
         @Override
@@ -194,16 +192,14 @@ public class OverlayConvergeScenario {
                     	public int size() {
 //                    		Assume number of news items varies according to node id
 //                    		i.e. node 12 has 10 news items, node 22 has 20 items, etc
-//                    		System.out.println(">>>> " + numNews);
-//                    		int count = 0;
-//                    		if(Integer.valueOf(selfAdr.getId().toString()) < 90) {
-//                    			count = (Integer.valueOf(selfAdr.getId().toString()) / 10) * 10;
-//                    		} else {
-//                    			count = 90 + numNews;
-//                    		}
-//                    		
-//                    		return count;
-                    		return numNews;
+                    		int count = 0;
+                    		if(Integer.valueOf(selfAdr.getId().toString()) < (NUM_NODES -10)) {
+                    			count = (Integer.valueOf(selfAdr.getId().toString()) / 10) * 10;
+                    		} else {
+                    			count = (NUM_NODES - 10) + numNews;
+                    		}
+                    		
+                    		return count;
                     	}
                     }, NewsComponentType.GRADIENT_NETWORK);
                 }
@@ -243,7 +239,7 @@ public class OverlayConvergeScenario {
                 StochasticProcess startPeers = new StochasticProcess() {
                     {
                         eventInterArrivalTime(uniform(1000, 1100));
-                        raise(NUM_NODES, startNodeOp, new BasicIntSequentialDistribution(1), new IntegerUniformDistribution(1, 100, new Random()));
+                        raise(NUM_NODES, startNodeOp, new BasicIntSequentialDistribution(1), new IntegerUniformDistribution(1, 3, new Random()));
                     }
                 };
 
@@ -260,7 +256,7 @@ public class OverlayConvergeScenario {
     
     public static void main(String[] args) {
         SimulationScenario.setSeed(ScenarioSetup.scenarioSeed);
-        SimulationScenario simpleBootScenario = OverlayConvergeScenario.scenario1();
+        SimulationScenario simpleBootScenario = LeaderFailureScenario.scenario1();
         simpleBootScenario.simulate(LauncherComp.class);
     }
 }

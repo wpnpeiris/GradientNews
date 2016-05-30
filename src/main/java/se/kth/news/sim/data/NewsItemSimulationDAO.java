@@ -32,7 +32,11 @@ public class NewsItemSimulationDAO implements INewsItemDAO {
 	public int size() {
 		return data.size();
 	}
-
+	
+	public int getDataSize() {
+		return data.size();
+	}
+	
 	@Override
 	public List<NewsItem> getAll() {
 		// TODO Auto-generated method stub

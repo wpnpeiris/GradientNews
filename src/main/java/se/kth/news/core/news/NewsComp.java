@@ -20,7 +20,7 @@ package se.kth.news.core.news;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import se.kth.news.core.leader.LeaderPushNotification;
+import se.kth.news.core.leader.LeaderEligablePort;
 import se.kth.news.core.leader.LeaderSelectPort;
 import se.kth.news.core.news.data.INewsItemDAO;
 import se.kth.news.core.news.util.NewsView;
@@ -58,15 +58,16 @@ public class NewsComp extends ComponentDefinition {
     Positive<CroupierPort> croupierPort = requires(CroupierPort.class);
     Positive<GradientPort> gradientPort = requires(GradientPort.class);
     Positive<LeaderSelectPort> leaderPort = requires(LeaderSelectPort.class);
+    Positive<LeaderEligablePort> leaderEligablePort = requires(LeaderEligablePort.class);
     Negative<OverlayViewUpdatePort> viewUpdatePort = provides(OverlayViewUpdatePort.class);
     //*******************************EXTERNAL_STATE*****************************
-    protected KAddress leader;
+    
 
     protected KAddress selfAdr;
     protected Identifier gradientOId;
     protected INewsItemDAO newItemDAO;
     //*******************************INTERNAL_STATE*****************************
-    private NewsView localNewsView;
+    protected NewsView localNewsView;
 
     public NewsComp(Init init) {
         selfAdr = init.selfAdr;
@@ -76,26 +77,8 @@ public class NewsComp extends ComponentDefinition {
         gradientOId = init.gradientOId;
         newItemDAO = init.newItemDAO;
 
-        subscribe(handleStart, control);
         subscribe(handlePing, networkPort);
         subscribe(handlePong, networkPort);
-    }
-
-    
-    Handler handleStart = new Handler<Start>() {
-        @Override
-        public void handle(Start event) {
-            LOG.info("{}starting...", logPrefix);
-            updateLocalNewsView();
-        }
-    };
-
-    private void updateLocalNewsView() {
-    	int newsCount = newItemDAO.size();
-    	
-        localNewsView = new NewsView(selfAdr.getId(), newsCount);
-        LOG.debug("{}informing overlays of new view", logPrefix);
-        trigger(new OverlayViewUpdate.Indication<>(gradientOId, false, localNewsView.copy()), viewUpdatePort);
     }
     
     ClassMatchedHandler handlePing

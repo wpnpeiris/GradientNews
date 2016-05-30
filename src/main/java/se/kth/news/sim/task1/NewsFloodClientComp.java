@@ -30,8 +30,8 @@ import se.sics.ktoolbox.util.network.basic.BasicHeader;
  * @author pradeeppeiris
  *
  */
-public class NewsFloodComp extends ComponentDefinition {
-	private static final Logger LOG = LoggerFactory.getLogger(NewsFloodComp.class);
+public class NewsFloodClientComp extends ComponentDefinition {
+	private static final Logger LOG = LoggerFactory.getLogger(NewsFloodClientComp.class);
     private String logPrefix = " ";
 
     public static final int TTL = 7;
@@ -49,7 +49,7 @@ public class NewsFloodComp extends ComponentDefinition {
 	private Component hostMngrComp;
 	
 	
-	public  NewsFloodComp(Init init) {
+	public  NewsFloodClientComp(Init init) {
 		selfAdr = init.selfAdr;
         logPrefix = "<nid:" + selfAdr.getId() + ">";
         LOG.info("{}initiating...", logPrefix);
@@ -92,7 +92,7 @@ public class NewsFloodComp extends ComponentDefinition {
         
         
 	}
-	public static class Init extends se.sics.kompics.Init<NewsFloodComp> {
+	public static class Init extends se.sics.kompics.Init<NewsFloodClientComp> {
 
         public final KAddress selfAdr;
         public final KAddress bootstrapServer;

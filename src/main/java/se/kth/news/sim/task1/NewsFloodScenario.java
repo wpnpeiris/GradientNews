@@ -157,12 +157,12 @@ public class NewsFloodScenario {
 
                 @Override
                 public Class getComponentDefinition() {
-                    return NewsFloodComp.class;
+                    return NewsFloodClientComp.class;
                 }
 
                 @Override
-                public NewsFloodComp.Init getComponentInit() {
-                    return new NewsFloodComp.Init(selfAdr, ScenarioSetup.bootstrapServer, ScenarioSetup.newsOverlayId, new INewsItemDAO() {
+                public NewsFloodClientComp.Init getComponentInit() {
+                    return new NewsFloodClientComp.Init(selfAdr, ScenarioSetup.bootstrapServer, ScenarioSetup.newsOverlayId, new INewsItemDAO() {
                     	private Map<String, NewsItem> data =  new HashMap<String, NewsItem>();
                     	
                     	public void save(NewsItem newsItem) {
@@ -186,6 +186,10 @@ public class NewsFloodScenario {
                     	}
                     	
                     	public int size() {
+                    		return data.size();
+                    	}
+                    	
+                    	public int getDataSize() {
                     		return data.size();
                     	}
                     }, nodeId > (NUM_NODES - NUM_MESSAGES) ? true : false);

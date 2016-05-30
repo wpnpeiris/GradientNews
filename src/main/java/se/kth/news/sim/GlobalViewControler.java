@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.Set;
 
 import se.sics.kompics.simulator.util.GlobalView;
+import se.sics.ktoolbox.util.network.KAddress;
 
 /**
  * @author pradeeppeiris
@@ -30,6 +31,7 @@ public class GlobalViewControler {
 	}
 	
 	public void setupGlobalView(GlobalView gv) {
+		gv.setValue("simulation.leader", null);
     	gv.setValue("simulation.leader_id", "-1");
     	gv.setValue("simulation.leader_selected", false);
     	
@@ -47,9 +49,10 @@ public class GlobalViewControler {
 		
 	}
 	
-	public void updateLeaderSection(GlobalView gv, String leaderId) {
+	public void updateLeaderSection(GlobalView gv, KAddress leader) {
 		gv.setValue("simulation.leader_selected", true);
-    	gv.setValue("simulation.leader_id", leaderId);
+    	gv.setValue("simulation.leader_id", leader.getId().toString());
+    	gv.setValue("simulation.leader", leader);
 	}
 	
 	public void updateGlobalOverlayConvergeView(GlobalView gv, String nodeId) {
@@ -81,5 +84,20 @@ public class GlobalViewControler {
 		data.add(nodeId);
 		gv.setValue("simulation.leader_coverage", data);
 	}
+	
+	public void updateGlobalNumMessagesView(GlobalView gv) {
+		gv.setValue("simulation.num_messages", gv.getValue("simulation.num_messages", Integer.class) + 1) ;
+	}
 		
+	public void updateGlobalNewsCoverageView(GlobalView gv, String nodeId) {
+    	Set<String> data = gv.getValue("simulation.news_coverage", HashSet.class) ;
+        data.add(nodeId);
+        gv.setValue("simulation.news_coverage", data);
+    }
+	
+	public void updateGlobalNodeKnowlegeView(GlobalView gv, String nodeId, int size) {
+    	Map<String, Integer> data = gv.getValue("simulation.node_knowlege", HashMap.class) ;
+    	data.put(nodeId, size);
+        gv.setValue("simulation.node_knowlege", data);
+    }
 }
