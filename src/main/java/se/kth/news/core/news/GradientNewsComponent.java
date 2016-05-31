@@ -60,8 +60,6 @@ public class GradientNewsComponent extends NewsComp {
     private boolean eligableForLeader = false;
     private boolean leaderLive = false;
     
-    private List<NewsItem> stagNewsItems = new ArrayList<NewsItem>();
-    
     public GradientNewsComponent(Init init) {
     	super(new NewsComp.Init(init.selfAdr, init.gradientOId, init.newItemDAO));
     	
@@ -112,7 +110,6 @@ public class GradientNewsComponent extends NewsComp {
     			pullLeaderInfo(sample);
     		}
     		
-    		handleStageNews();
     		pullNews(sample);
     		
 //    		Leader Dissemination in Push mode
@@ -123,7 +120,20 @@ public class GradientNewsComponent extends NewsComp {
         }
     };
     
+    private void pushLeaderInfo(TGradientSample sample) {
+		for(Object obj: sample.gradientFingers) {
+			GlobalViewControler.getInstance().updateGlobalLeaderPushNotificationView(config().getValue("simulation.globalview", GlobalView.class));
+			Container<KAddress, NewsView> neighbour = (Container<KAddress, NewsView>) obj;
+			KAddress neighbourAddr = neighbour.getSource();
+			KHeader header = new BasicHeader(selfAdr, neighbourAddr, Transport.UDP);
+			KContentMsg msg = new BasicContentMsg(header, new LeaderPushNotification(leader));
+			trigger(msg, networkPort);
+		}
+	}
+    
     private void pullNews(TGradientSample sample) {
+    	handleStageNews();
+    	
     	for(Object obj: sample.getGradientNeighbours()) {
     		Container<KAddress, NewsView> neighbour = (Container<KAddress, NewsView>) obj;
     		KAddress neighbourAddr = neighbour.getSource();
@@ -135,15 +145,18 @@ public class GradientNewsComponent extends NewsComp {
     
     private void handleStageNews() {
     	
-    	if(stagNewsItems.size() > 0 && leader != null && isNotLeader()) {
+    	if(leader != null && isNotLeader()) {
     		LOG.info("{} Node {} Write stage news on Leader {} ", logPrefix, selfAdr, leader);
-    		for(NewsItem newsItem : stagNewsItems) {
-    			KHeader header = new BasicHeader(selfAdr, leader, Transport.UDP);
-    			KContentMsg msg = new BasicContentMsg(header, newsItem);
-    			trigger(msg, networkPort);
-    		}
     		
-    		stagNewsItems.clear();
+    		for(NewsItem newsItem : newItemDAO.getAll()) {
+    			if(newsItem.isStage()) {
+    				newsItem.setStage(false);
+    				KHeader header = new BasicHeader(selfAdr, leader, Transport.UDP);
+        			KContentMsg msg = new BasicContentMsg(header, newsItem);
+        			trigger(msg, networkPort);
+    			}
+    			
+    		}
     	}
     }
     
@@ -156,16 +169,7 @@ public class GradientNewsComponent extends NewsComp {
     	
     }
     
-	private void pushLeaderInfo(TGradientSample sample) {
-		for(Object obj: sample.gradientFingers) {
-			GlobalViewControler.getInstance().updateGlobalLeaderPushNotificationView(config().getValue("simulation.globalview", GlobalView.class));
-			Container<KAddress, NewsView> neighbour = (Container<KAddress, NewsView>) obj;
-			KAddress neighbourAddr = neighbour.getSource();
-			KHeader header = new BasicHeader(selfAdr, neighbourAddr, Transport.UDP);
-			KContentMsg msg = new BasicContentMsg(header, new LeaderPushNotification(leader));
-			trigger(msg, networkPort);
-		}
-	}
+	
 	
     
     
@@ -183,7 +187,7 @@ public class GradientNewsComponent extends NewsComp {
     		
     		GlobalViewControler.getInstance().updateGlobalConvergeNodeCount(config().getValue("simulation.globalview", GlobalView.class));
     		
-    		triggerInitElection();
+    		triggerGradientStablized();
     	}
     }
     
@@ -200,7 +204,7 @@ public class GradientNewsComponent extends NewsComp {
     	return sb.toString();
     }
     
-    private void triggerInitElection() {
+    private void triggerGradientStablized() {
     	KHeader header = new BasicHeader(selfAdr, selfAdr, Transport.UDP);
 		KContentMsg msg = new BasicContentMsg(header, new InitElection());
 		trigger(msg, networkPort);
@@ -269,8 +273,8 @@ public class GradientNewsComponent extends NewsComp {
 			if (newItemDAO.cotains(newsItem)) {
 				LOG.debug("{} received {} already exists", logPrefix, newsItem);
 			} else {
+				newsItem.setStage(true);
 				newItemDAO.save(newsItem);
-				stagNewsItems.add(newsItem);
 				GlobalViewControler.getInstance().updateGlobalNewsCoverageView(config().getValue("simulation.globalview", GlobalView.class), selfAdr.getId().toString());
 				GlobalViewControler.getInstance().updateGlobalNodeKnowlegeView(config().getValue("simulation.globalview", GlobalView.class), selfAdr.getId().toString(), newItemDAO.getDataSize());
 			}
@@ -326,7 +330,7 @@ public class GradientNewsComponent extends NewsComp {
     Handler handleLeaderEligable = new Handler<LeaderEligable>() {
         @Override
         public void handle(LeaderEligable event) {
-        	LOG.info("{} Eligable Leader {}", logPrefix, selfAdr);
+        	LOG.debug("{} Eligable Leader {}", logPrefix, selfAdr);
         	eligableForLeader = true;
         	startLeaderDetectorTimer();
         }
@@ -358,6 +362,7 @@ public class GradientNewsComponent extends NewsComp {
 	    		startLeaderDetectorTimer();
 			} else {
 				LOG.info("{} Detect leader failure at :{} and initiate election", logPrefix, selfAdr);
+				gradientStable = false;
 			}
 		}
 	};

@@ -72,7 +72,7 @@ public class LeaderSelectComp extends ComponentDefinition {
     private final int GRADIENT_STABLE_ROUND = 10;
     private int currentRound = 0;
     private boolean gradientNotStablized = true;
-//    private boolean eligableForLeader = false;
+    private boolean eligableForLeader = false;
 //    private Set<KAddress> eligableLeaders = new HashSet<KAddress>();
     
     private INewsItemDAO newItemDAO;
@@ -114,28 +114,8 @@ public class LeaderSelectComp extends ComponentDefinition {
         @Override
         public void handle(Start event) {
             LOG.info("{}starting...", logPrefix);
-//            startInitElectionTimeoutTimer();
         }
     };
-    
-//	private void startInitElectionTimeoutTimer() {
-//		SchedulePeriodicTimeout spt = new SchedulePeriodicTimeout(0, 10000);
-//		InitElectionTimeout timeout = new InitElectionTimeout(spt);
-//		spt.setTimeoutEvent(timeout);
-//		trigger(spt, timerPort);
-//		initElectionTimerId = timeout.getTimeoutId();
-//	}
-    
-//    Handler<InitElectionTimeout> InitElectionTimeoutHandler = new Handler<InitElectionTimeout>() {
-//		public void handle(InitElectionTimeout event) {
-//			if(eligableForLeader && eligableLeaders.size() > 0) {
-//				
-//				System.out.println(">>>>>>> " + eligableLeaders);
-//				trigger(new CancelPeriodicTimeout(initElectionTimerId), timerPort);
-//			}
-//			
-//		}
-//	};
 	
     Handler handleGradientSample = new Handler<TGradientSample>() {
         @Override
@@ -154,16 +134,13 @@ public class LeaderSelectComp extends ComponentDefinition {
 		int neighbourUtilVal = highUtilNeighbour.getContent().localNewsCount;
 		if(localNewsView.localNewsCount >= neighbourUtilVal) {
 			LOG.info("{}  Node: " + selfAdr.getId() +  " is eligable for leader amoung: {}", logPrefix, sample.getGradientNeighbours());
-//			eligableForLeader = true;
-			
-			 
+			eligableForLeader = true;
 			trigger(new LeaderEligable(), leaderEligable);
 			 
 			for(Object obj: sample.getGradientNeighbours()) {
 				Container<KAddress, NewsView> neighbour = (Container<KAddress, NewsView>) obj;
 				KAddress neighbourAddr = neighbour.getSource();
 				triggerElectionMessage(neighbourAddr);
-//				triggerElectionEligableMessage(neighbourAddr);
 			}
 			
 			startElectionTimeoutTimer();
@@ -262,7 +239,8 @@ public class LeaderSelectComp extends ComponentDefinition {
         public void handle(Election content, KContentMsg<?, ?, Election> container) {
             LOG.debug("{} received Election message at:{} from:{}", logPrefix, selfAdr, container.getHeader().getSource());
             if(Integer.valueOf(selfAdr.getId().toString()) >= Integer.valueOf(container.getHeader().getSource().getId().toString())){
-	            if(localNewsView.localNewsCount >= content.getUtility()) {
+//	            This is more accurate than checking 'eligableForLeader' flag
+            	if(localNewsView.localNewsCount >= content.getUtility()) {
 	            		trigger(container.answer(new ElectionAck()), networkPort);		
 	            } 
             } 

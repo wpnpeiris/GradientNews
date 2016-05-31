@@ -15,6 +15,8 @@ public class NewsItem {
 	private String news;
 	
 	private int ttl;
+	
+	private boolean stage;
 
 	public NewsItem(String id, String news) {
 		this.id = id;
@@ -27,7 +29,11 @@ public class NewsItem {
 		this.ttl = ttl;
 	}
 	
-	
+	public NewsItem(String id, String news, boolean stage) {
+		this.id = id;
+		this.news = news;
+		this.stage = stage;
+	}
 	
 	public String getId() {
 		return id;
@@ -52,7 +58,16 @@ public class NewsItem {
         return new NewsItem(id, news, ttl);
     }
     
-    @Override
+    
+    public boolean isStage() {
+		return stage;
+	}
+
+	public void setStage(boolean stage) {
+		this.stage = stage;
+	}
+
+	@Override
     public String toString() {
         return "NewsItem<" + id + ", " + news + ", " + ttl + ">";
     }

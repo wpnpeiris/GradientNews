@@ -49,7 +49,7 @@ import se.sics.ktoolbox.util.overlays.id.OverlayIdRegistry;
  * @author Alex Ormenisan <aaor@kth.se>
  */
 public class NewsDisseminationScenario {
-	protected static final int NUM_NODES = 500;
+	protected static final int NUM_NODES = 900;
 	public static final int NUM_MESSAGES = 5;
 	
     static Operation<SetupEvent> systemSetupOp = new Operation<SetupEvent>() {
