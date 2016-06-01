@@ -19,6 +19,7 @@ package se.kth.news.core.leader;
 
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -35,7 +36,6 @@ import se.sics.kompics.Positive;
 import se.sics.kompics.Start;
 import se.sics.kompics.network.Network;
 import se.sics.kompics.network.Transport;
-import se.sics.kompics.timer.CancelPeriodicTimeout;
 import se.sics.kompics.timer.SchedulePeriodicTimeout;
 import se.sics.kompics.timer.ScheduleTimeout;
 import se.sics.kompics.timer.Timeout;
@@ -80,11 +80,13 @@ public class LeaderSelectComp extends ComponentDefinition {
     private Set<ElectionAck> acks = new HashSet<ElectionAck>();
     
 //    private KAddress leaderSelected;
-    private boolean initElection = false;
+//    private boolean initElection = false;
     
     private UUID electionTimerId;
     private UUID initElectionTimerId;
     private UUID leaderFailureTimerId;
+    
+    private TGradientSample lastGradientSample;
     
     public LeaderSelectComp(Init init) {
         selfAdr = init.selfAdr;
@@ -100,6 +102,7 @@ public class LeaderSelectComp extends ComponentDefinition {
         subscribe(handleElection, networkPort);
         subscribe(handleElectionAck, networkPort);
         subscribe(handleInitElection, networkPort);
+        subscribe(handleLeaderEligibaleNotification, networkPort);
         subscribe(timeoutHandler, timerPort);
         subscribe(leaderFailureTimeoutHandler, timerPort);
         
@@ -120,38 +123,60 @@ public class LeaderSelectComp extends ComponentDefinition {
     Handler handleGradientSample = new Handler<TGradientSample>() {
         @Override
         public void handle(TGradientSample sample) {
-        	if(initElection) {
-        		initElection = false;
-        		checkEligableLeaders(sample);
-        	}
+        	lastGradientSample = sample;
         }
     };
     
-    
+    ClassMatchedHandler handleInitElection = new ClassMatchedHandler<InitElection, KContentMsg<?, ?, InitElection>>() {
+
+        @Override
+        public void handle(InitElection content, KContentMsg<?, ?, InitElection> container) {
+            LOG.info("{} received InitElection at:{} ", logPrefix, selfAdr);
+            checkEligableLeaders(lastGradientSample);
+        }
+    };
     
     private void checkEligableLeaders(TGradientSample sample) {
     	Container<KAddress, NewsView> highUtilNeighbour = getHighUtilNeighbour(sample);
 		int neighbourUtilVal = highUtilNeighbour.getContent().localNewsCount;
 		if(localNewsView.localNewsCount >= neighbourUtilVal) {
-			LOG.info("{}  Node: " + selfAdr.getId() +  " is eligable for leader amoung: {}", logPrefix, sample.getGradientNeighbours());
+			LOG.info("{}  Node: " + selfAdr.getId() +  " is eligable for leader", logPrefix);
 			eligableForLeader = true;
 			trigger(new LeaderEligable(), leaderEligable);
-			 
 			for(Object obj: sample.getGradientNeighbours()) {
 				Container<KAddress, NewsView> neighbour = (Container<KAddress, NewsView>) obj;
 				KAddress neighbourAddr = neighbour.getSource();
-				triggerElectionMessage(neighbourAddr);
+				KHeader header = new BasicHeader(selfAdr, neighbourAddr, Transport.UDP);
+				KContentMsg msg = new BasicContentMsg(header, new LeaderEligibaleNotification());
+				trigger(msg, networkPort);
 			}
 			
-			startElectionTimeoutTimer();
+			callElection();
 		}
     }
     
-//    private void triggerElectionEligableMessage(KAddress neighbourAddr) {
-//    	KHeader header = new BasicHeader(selfAdr, neighbourAddr, Transport.UDP);
-//    	KContentMsg msg = new BasicContentMsg(header, new EligableLeader(selfAdr));
-//		trigger(msg, networkPort);
-//    }
+    ClassMatchedHandler handleLeaderEligibaleNotification = new ClassMatchedHandler<LeaderEligibaleNotification, KContentMsg<?, ?, LeaderEligibaleNotification>>() {
+
+        @Override
+        public void handle(LeaderEligibaleNotification content, KContentMsg<?, ?, LeaderEligibaleNotification> container) {
+            LOG.debug("{} received LeaderEligibaleNotification at:{} from:{}", logPrefix, selfAdr, container.getHeader().getSource());
+            LOG.info("{}  Node: " + selfAdr.getId() +  " is eligable for leader", logPrefix);
+            eligableForLeader = true;
+            trigger(new LeaderEligable(), leaderEligable);
+            
+            callElection();
+        }
+    };
+    
+    private void callElection() {
+    	for(Object obj: lastGradientSample.getGradientNeighbours()) {
+			Container<KAddress, NewsView> neighbour = (Container<KAddress, NewsView>) obj;
+			KAddress neighbourAddr = neighbour.getSource();
+			triggerElectionMessage(neighbourAddr);
+		}
+	
+		startElectionTimeoutTimer();
+    }
     
     private void triggerElectionMessage(KAddress neighbourAddr) {
     	KHeader header = new BasicHeader(selfAdr, neighbourAddr, Transport.UDP);
@@ -177,60 +202,15 @@ public class LeaderSelectComp extends ComponentDefinition {
 		}
 	};
 	
-//	private void startLeaderHearbeatTimer() {
-//    	SchedulePeriodicTimeout spt = new SchedulePeriodicTimeout(0, 5000);
-//    	LeaderHeartbeatTimeout timeout = new LeaderHeartbeatTimeout(spt);
-//		spt.setTimeoutEvent(timeout);
-//		trigger(spt, timerPort);
-//		
-//    }
-	
-//	Handler<LeaderHeartbeatTimeout> leaderCheckTimeoutHandler = new Handler<LeaderHeartbeatTimeout>() {
-//		public void handle(LeaderHeartbeatTimeout event) {
-//			for(KAddress eligableLeader: eligableLeaders){
-//				KHeader header = new BasicHeader(selfAdr, eligableLeader, Transport.UDP);
-//				KContentMsg msg = new BasicContentMsg(header, new LeaderHeartbeat());
-//				trigger(msg, networkPort);
-//			}
-//		}
-//	};
-	
-	
     private Container<KAddress, NewsView> getHighUtilNeighbour(TGradientSample sample) {
     	return (Container<KAddress, NewsView>) sample.gradientNeighbours.get(sample.gradientNeighbours.size() - 1);
     }
-    
-//    ClassMatchedHandler handleLeaderHeartbeat = new ClassMatchedHandler<LeaderHeartbeat, KContentMsg<?, ?, LeaderHeartbeat>>() {
-//
-//        @Override
-//        public void handle(LeaderHeartbeat content, KContentMsg<?, ?, LeaderHeartbeat> container) {
-//            LOG.info("{} received LeaderHeartbeat at:{} ", logPrefix, selfAdr);
-//            startLeaderFailureTimeoutTimer();
-//        }
-//    };
-    
-//    private void startLeaderFailureTimeoutTimer() {
-//    	ScheduleTimeout spt = new ScheduleTimeout(1000);
-//    	LeaderFailureTimeout timeout = new LeaderFailureTimeout(spt);
-//		spt.setTimeoutEvent(timeout);
-//		trigger(spt, timerPort);
-//		leaderFailureTimerId = timeout.getTimeoutId();
-//    }
     
     Handler<LeaderFailureTimeout> leaderFailureTimeoutHandler = new Handler<LeaderFailureTimeout>() {
 		public void handle(LeaderFailureTimeout event) {
 			LOG.info("{} Leader failure detected at:{} ", logPrefix, selfAdr);
 		}
 	};
-	
-//    ClassMatchedHandler handleEligableLeader = new ClassMatchedHandler<EligableLeader, KContentMsg<?, ?, EligableLeader>>() {
-//
-//        @Override
-//        public void handle(EligableLeader content, KContentMsg<?, ?, EligableLeader> container) {
-//            LOG.debug("{} received EligableLeader at:{} ", logPrefix, selfAdr);
-//            eligableLeaders.add(content.eligableLeaderAdr);
-//        }
-//    };
     
     
     ClassMatchedHandler handleElection = new ClassMatchedHandler<Election, KContentMsg<?, ?, Election>>() {
@@ -247,14 +227,7 @@ public class LeaderSelectComp extends ComponentDefinition {
         }
     };
     
-    ClassMatchedHandler handleInitElection = new ClassMatchedHandler<InitElection, KContentMsg<?, ?, InitElection>>() {
 
-        @Override
-        public void handle(InitElection content, KContentMsg<?, ?, InitElection> container) {
-            LOG.debug("{} received InitElection at:{} ", logPrefix, selfAdr);
-            initElection = true;
-        }
-    };
     
     ClassMatchedHandler handleElectionAck = new ClassMatchedHandler<ElectionAck, KContentMsg<?, ?, ElectionAck>>() {
 

@@ -29,6 +29,7 @@ import se.sics.kompics.Handler;
 import se.sics.kompics.Positive;
 import se.sics.kompics.Start;
 import se.sics.kompics.network.Network;
+import se.sics.kompics.simulator.events.system.KillNodeEvent;
 import se.sics.kompics.timer.Timer;
 import se.sics.ktoolbox.cc.heartbeat.CCHeartbeatPort;
 import se.sics.ktoolbox.croupier.CroupierPort;
@@ -78,6 +79,7 @@ public class HostMngrComp extends ComponentDefinition {
         subscribe(handleStart, control);
     }
 
+    
     Handler handleStart = new Handler<Start>() {
         @Override
         public void handle(Start event) {

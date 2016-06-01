@@ -24,10 +24,8 @@ import java.util.Map;
 import java.util.Random;
 
 import se.kth.news.core.NewsComponentType;
-import se.kth.news.core.news.NewsComp;
 import se.kth.news.core.news.data.INewsItemDAO;
 import se.kth.news.core.news.data.NewsItem;
-import se.kth.news.core.news.util.NewsView;
 import se.kth.news.sim.GlobalViewControler;
 import se.kth.news.sim.ScenarioSetup;
 import se.kth.news.sim.compatibility.SimNodeIdExtractor;
@@ -36,15 +34,16 @@ import se.sics.kompics.Init;
 import se.sics.kompics.network.Address;
 import se.sics.kompics.simulator.SimulationScenario;
 import se.sics.kompics.simulator.adaptor.Operation;
+import se.sics.kompics.simulator.adaptor.Operation1;
 import se.sics.kompics.simulator.adaptor.Operation2;
 import se.sics.kompics.simulator.adaptor.distributions.IntegerUniformDistribution;
 import se.sics.kompics.simulator.adaptor.distributions.extra.BasicIntSequentialDistribution;
+import se.sics.kompics.simulator.events.system.KillNodeEvent;
 import se.sics.kompics.simulator.events.system.SetupEvent;
 import se.sics.kompics.simulator.events.system.StartNodeEvent;
 import se.sics.kompics.simulator.network.identifier.IdentifierExtractor;
 import se.sics.kompics.simulator.run.LauncherComp;
 import se.sics.kompics.simulator.util.GlobalView;
-import se.sics.ktoolbox.croupier.event.CroupierSample;
 import se.sics.ktoolbox.omngr.bootstrap.BootstrapServerComp;
 import se.sics.ktoolbox.util.network.KAddress;
 import se.sics.ktoolbox.util.overlays.id.OverlayIdRegistry;
@@ -111,7 +110,8 @@ public class LeaderFailureScenario {
 			};
 		}
 	};
-	
+
+    
     static Operation<StartNodeEvent> startBootstrapServerOp = new Operation<StartNodeEvent>() {
 
         @Override
@@ -136,6 +136,29 @@ public class LeaderFailureScenario {
                 @Override
                 public BootstrapServerComp.Init getComponentInit() {
                     return new BootstrapServerComp.Init(selfAdr);
+                }
+            };
+        }
+    };
+    
+    static Operation1<KillNodeEvent, Integer> killNodeOp = new Operation1<KillNodeEvent, Integer>() {
+        @Override
+        public KillNodeEvent generate(final Integer nodeId) {
+        	return new KillNodeEvent() {
+                KAddress selfAdr;
+
+                {
+                    selfAdr = ScenarioSetup.getNodeAdr(nodeId);
+                }
+
+                @Override
+                public Address getNodeAddress() {
+                    return selfAdr;
+                }
+                
+                @Override
+                public String toString() {
+                    return "KillNode<" + selfAdr.toString() + ">";
                 }
             };
         }
@@ -190,11 +213,12 @@ public class LeaderFailureScenario {
                     	}
                     	
                     	public int size() {
-//                    		Assume number of news items varies according to node id
-//                    		i.e. node 12 has 10 news items, node 22 has 20 items, etc
+//                    		Set last node with highr utility so that it will be selected as leader
                     		int count = 0;
                     		if(Integer.valueOf(selfAdr.getId().toString()) < (NUM_NODES -10)) {
                     			count = (Integer.valueOf(selfAdr.getId().toString()) / 10) * 10;
+                    		} else if(Integer.valueOf(selfAdr.getId().toString()) == NUM_NODES){
+                    			count = NUM_NODES * 100;
                     		} else {
                     			count = (NUM_NODES - 10) + numNews;
                     		}
@@ -242,12 +266,20 @@ public class LeaderFailureScenario {
                         raise(NUM_NODES, startNodeOp, new BasicIntSequentialDistribution(1), new IntegerUniformDistribution(1, 3, new Random()));
                     }
                 };
+                
+                StochasticProcess killPeer = new StochasticProcess() {
+                    {
+                        eventInterArrivalTime(uniform(1000, 1100));
+                        raise(1, killNodeOp, new BasicIntSequentialDistribution(NUM_NODES));
+                    }
+                };
 
                 systemSetup.start();
                 observer.startAfterTerminationOf(1000, systemSetup);
                 startBootstrapServer.startAfterTerminationOf(1000, observer);
                 startPeers.startAfterTerminationOf(1000, startBootstrapServer);
-                terminateAfterTerminationOf(1000*1000, startPeers);
+                killPeer.startAfterTerminationOf(1000*1000, startPeers);
+                terminateAfterTerminationOf(1000*1000, killPeer);
             }
         };
 

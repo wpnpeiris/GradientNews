@@ -55,7 +55,7 @@ import se.sics.ktoolbox.util.overlays.id.OverlayIdRegistry;
  * @author Alex Ormenisan <aaor@kth.se>
  */
 public class LeaderDisseminationScenario {
-	protected static final int NUM_NODES = 500;
+	protected static final int NUM_NODES = 100;
 	
     static Operation<SetupEvent> systemSetupOp = new Operation<SetupEvent>() {
         @Override

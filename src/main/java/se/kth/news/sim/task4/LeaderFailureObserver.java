@@ -8,17 +8,22 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import se.kth.news.core.leader.ShutdownNode;
 import se.sics.kompics.ComponentDefinition;
 import se.sics.kompics.Handler;
 import se.sics.kompics.Positive;
 import se.sics.kompics.Start;
-import se.sics.kompics.Stop;
 import se.sics.kompics.network.Network;
+import se.sics.kompics.network.Transport;
 import se.sics.kompics.simulator.util.GlobalView;
 import se.sics.kompics.timer.SchedulePeriodicTimeout;
 import se.sics.kompics.timer.Timeout;
 import se.sics.kompics.timer.Timer;
 import se.sics.ktoolbox.util.network.KAddress;
+import se.sics.ktoolbox.util.network.KContentMsg;
+import se.sics.ktoolbox.util.network.KHeader;
+import se.sics.ktoolbox.util.network.basic.BasicContentMsg;
+import se.sics.ktoolbox.util.network.basic.BasicHeader;
 
 /**
  * @author pradeeppeiris
@@ -57,9 +62,12 @@ public class LeaderFailureObserver extends ComponentDefinition {
         public void handle(CheckTimeout event) {
     		GlobalView gv = config().getValue("simulation.globalview", GlobalView.class);
     		if(gv.getValue("simulation.leader_selected", Boolean.class) == true) {
-    			LOG.info("{} is selected as leader", gv.getValue("simulation.leader_id", String.class));
-    			KAddress leaderNode = gv.getValue("simulation.leader", KAddress.class);
-    			System.out.println(">>>>>>>>>> " + leaderNode.getId());
+    			LOG.debug("{} is selected as leader", gv.getValue("simulation.leader_id", String.class));
+//    			KAddress leaderNode = gv.getValue("simulation.leader", KAddress.class);
+    			
+//    			KHeader header = new BasicHeader(leaderNode, leaderNode, Transport.UDP);
+//        		KContentMsg msg = new BasicContentMsg(header, new ShutdownNode());
+//        		trigger(msg, network);
 //    			gv.terminate();
     		}
     	}    		

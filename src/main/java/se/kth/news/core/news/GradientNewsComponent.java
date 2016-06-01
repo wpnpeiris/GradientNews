@@ -3,9 +3,9 @@
  */
 package se.kth.news.core.news;
 
-import java.util.ArrayList;
 import java.util.List;
 
+import org.javatuples.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,15 +19,19 @@ import se.kth.news.core.leader.LeaderPushNotification;
 import se.kth.news.core.leader.LeaderUpdate;
 import se.kth.news.core.leader.NewsItemInfo;
 import se.kth.news.core.leader.NewsPullNotification;
-import se.kth.news.core.leader.LeaderSelectComp.ElectionTimeout;
+import se.kth.news.core.leader.ShutdownNode;
 import se.kth.news.core.news.data.INewsItemDAO;
 import se.kth.news.core.news.data.NewsItem;
 import se.kth.news.core.news.util.NewsView;
 import se.kth.news.sim.GlobalViewControler;
+import se.sics.kompics.Channel;
 import se.sics.kompics.ClassMatchedHandler;
+import se.sics.kompics.Component;
 import se.sics.kompics.Handler;
+import se.sics.kompics.Kill;
 import se.sics.kompics.Start;
 import se.sics.kompics.network.Transport;
+import se.sics.kompics.simulator.events.system.KillNodeEvent;
 import se.sics.kompics.simulator.util.GlobalView;
 import se.sics.kompics.timer.ScheduleTimeout;
 import se.sics.kompics.timer.Timeout;
@@ -59,12 +63,15 @@ public class GradientNewsComponent extends NewsComp {
     private boolean isLeader = false;
     private boolean eligableForLeader = false;
     private boolean leaderLive = false;
+    private boolean leaderAck = false;
     
     public GradientNewsComponent(Init init) {
     	super(new NewsComp.Init(init.selfAdr, init.gradientOId, init.newItemDAO));
     	
     	
     	subscribe(handleStart, control);
+    	
+    	
         subscribe(handleGradientSample, gradientPort);
     	subscribe(handleLeader, leaderPort);
     	subscribe(handleLeaderEligable, leaderEligablePort);
@@ -77,10 +84,17 @@ public class GradientNewsComponent extends NewsComp {
     	
     	subscribe(handleHearbeatRequest, networkPort);
     	subscribe(handleHearbeatResponse, networkPort);
+    	subscribe(handleShutdown, networkPort);
+    	
     	subscribe(leaderDetectorHandler, timerPort);
+    	subscribe(shutdownTimeoutHandler, timerPort);
     	
     	
     	
+    }
+    
+    public void tearDown() {
+    	 LOG.info("{} Tear down node {} ", logPrefix, selfAdr);
     }
     
     Handler handleStart = new Handler<Start>() {
@@ -91,7 +105,7 @@ public class GradientNewsComponent extends NewsComp {
             
         }
     };
-
+    
     private void updateLocalNewsView() {
     	int newsCount = newItemDAO.size();
     	
@@ -146,7 +160,7 @@ public class GradientNewsComponent extends NewsComp {
     private void handleStageNews() {
     	
     	if(leader != null && isNotLeader()) {
-    		LOG.info("{} Node {} Write stage news on Leader {} ", logPrefix, selfAdr, leader);
+    		LOG.debug("{} Node {} Write stage news on Leader {} ", logPrefix, selfAdr, leader);
     		
     		for(NewsItem newsItem : newItemDAO.getAll()) {
     			if(newsItem.isStage()) {
@@ -174,6 +188,7 @@ public class GradientNewsComponent extends NewsComp {
     
     
     private void checkGradientStablity(TGradientSample sample) {
+    	
     	String latestNeighbourIdList = createNeighbourIdList(sample);
 		if(latestNeighbourIdList.equals(neighbourIdList)) {
     		gradientRoundFlag++;
@@ -351,19 +366,23 @@ public class GradientNewsComponent extends NewsComp {
 				return;
 			} 
 			
-			if(leaderLive) {
-				LOG.debug("{} Send HearbeatRequest to leader :{} from:{}", logPrefix, leader, selfAdr);
-				KHeader header = new BasicHeader(selfAdr, leader, Transport.UDP);
-	    		KContentMsg msg = new BasicContentMsg(header, new HearbeatRequest());
-	    		trigger(msg, networkPort);
-	    		leaderLive = false;
-	    		
-	    		LOG.debug("{} Start leader detection timer :{}", logPrefix, selfAdr);
-	    		startLeaderDetectorTimer();
-			} else {
-				LOG.info("{} Detect leader failure at :{} and initiate election", logPrefix, selfAdr);
-				gradientStable = false;
+			if(isNotLeader()) {
+				if(leaderAck) {
+					leaderAck = false;
+					LOG.debug("{} Send HearbeatRequest to leader :{} from:{}", logPrefix, leader, selfAdr);
+					KHeader header = new BasicHeader(selfAdr, leader, Transport.UDP);
+		    		KContentMsg msg = new BasicContentMsg(header, new HearbeatRequest());
+		    		trigger(msg, networkPort);
+		    		
+		    		
+		    		LOG.debug("{} Start leader detection timer :{}", logPrefix, selfAdr);
+		    		startLeaderDetectorTimer();
+				} else {
+					LOG.info("{} Detect leader failure at :{} and initiate election", logPrefix, selfAdr);
+//					gradientStable = false;
+				}
 			}
+			
 		}
 	};
 	
@@ -381,13 +400,33 @@ public class GradientNewsComponent extends NewsComp {
         @Override
         public void handle(HearbeatResponse content, KContentMsg<?, ?, HearbeatResponse> container) {
             LOG.debug("{} received HearbeatResponse message at:{} from:{}", logPrefix, selfAdr, container.getHeader().getSource());
-            leaderLive = true;	
+            leaderAck = true;	
         }
     };
     
     
+    ClassMatchedHandler handleShutdown = new ClassMatchedHandler<ShutdownNode, KContentMsg<?, ?, ShutdownNode>>() {
 
-		
+        @Override
+        public void handle(ShutdownNode content, KContentMsg<?, ?, ShutdownNode> container) {
+            LOG.info("{}  received ShutdownNode message at:{} ", logPrefix, selfAdr);
+            startShutdownNodeTimer();
+        }
+    };
+	
+    private void startShutdownNodeTimer() {
+    	ScheduleTimeout spt = new ScheduleTimeout(10000);
+    	ShutdownTimeout timeout = new ShutdownTimeout(spt);
+		spt.setTimeoutEvent(timeout);
+		trigger(spt, timerPort);
+    }
+    
+    Handler<ShutdownTimeout> shutdownTimeoutHandler = new Handler<ShutdownTimeout>() {
+		public void handle(ShutdownTimeout event) {
+			LOG.info("{} Shutdown node :{} ", logPrefix, selfAdr);
+			
+		}
+	};
 		
 	public static class Init extends se.sics.kompics.Init<GradientNewsComponent> {
 
@@ -404,6 +443,12 @@ public class GradientNewsComponent extends NewsComp {
 	
 	public static class LeaderDetectorTimeout extends Timeout {
 		public LeaderDetectorTimeout(ScheduleTimeout spt) {
+			super(spt);
+		}
+	}
+	
+	public static class ShutdownTimeout extends Timeout {
+		public ShutdownTimeout(ScheduleTimeout spt) {
 			super(spt);
 		}
 	}

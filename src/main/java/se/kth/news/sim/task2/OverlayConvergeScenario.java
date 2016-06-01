@@ -55,7 +55,7 @@ import se.sics.ktoolbox.util.overlays.id.OverlayIdRegistry;
  * @author Alex Ormenisan <aaor@kth.se>
  */
 public class OverlayConvergeScenario {
-	public static final int NUM_NODES = 500;
+	public static final int NUM_NODES = 900;
 	
     static Operation<SetupEvent> systemSetupOp = new Operation<SetupEvent>() {
         @Override
