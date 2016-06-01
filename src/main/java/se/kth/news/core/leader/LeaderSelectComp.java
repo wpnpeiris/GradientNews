@@ -73,14 +73,10 @@ public class LeaderSelectComp extends ComponentDefinition {
     private int currentRound = 0;
     private boolean gradientNotStablized = true;
     private boolean eligableForLeader = false;
-//    private Set<KAddress> eligableLeaders = new HashSet<KAddress>();
     
     private INewsItemDAO newItemDAO;
     private NewsView localNewsView;
     private Set<ElectionAck> acks = new HashSet<ElectionAck>();
-    
-//    private KAddress leaderSelected;
-//    private boolean initElection = false;
     
     private UUID electionTimerId;
     private UUID initElectionTimerId;
@@ -196,7 +192,6 @@ public class LeaderSelectComp extends ComponentDefinition {
 		public void handle(ElectionTimeout event) {
 			if(acks.size() == 0) {
 				LOG.info("{} Leader is selected as:{} ", logPrefix, selfAdr);
-//				startLeaderHearbeatTimer();
 	            trigger(new LeaderUpdate(), leaderUpdate);
 			}
 		}
@@ -226,9 +221,7 @@ public class LeaderSelectComp extends ComponentDefinition {
             } 
         }
     };
-    
-
-    
+   
     ClassMatchedHandler handleElectionAck = new ClassMatchedHandler<ElectionAck, KContentMsg<?, ?, ElectionAck>>() {
 
         @Override

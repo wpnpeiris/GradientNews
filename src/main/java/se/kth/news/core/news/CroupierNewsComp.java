@@ -109,9 +109,7 @@ public class CroupierNewsComp extends NewsComp {
 		KContentMsg msg = new BasicContentMsg(header, newsItem);
 		trigger(msg, networkPort);
     }
-    
-
-	
+    	
 	private void updateGlobalNewsCoverageView() {
     	GlobalView gv = config().getValue("simulation.globalview", GlobalView.class);
     	Set<String> data = gv.getValue("simulation.news_coverage", HashSet.class) ;

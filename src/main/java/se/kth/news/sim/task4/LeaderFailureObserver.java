@@ -3,27 +3,22 @@
  */
 package se.kth.news.sim.task4;
 
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import se.kth.news.core.leader.ShutdownNode;
 import se.sics.kompics.ComponentDefinition;
 import se.sics.kompics.Handler;
 import se.sics.kompics.Positive;
 import se.sics.kompics.Start;
 import se.sics.kompics.network.Network;
-import se.sics.kompics.network.Transport;
 import se.sics.kompics.simulator.util.GlobalView;
 import se.sics.kompics.timer.SchedulePeriodicTimeout;
 import se.sics.kompics.timer.Timeout;
 import se.sics.kompics.timer.Timer;
-import se.sics.ktoolbox.util.network.KAddress;
-import se.sics.ktoolbox.util.network.KContentMsg;
-import se.sics.ktoolbox.util.network.KHeader;
-import se.sics.ktoolbox.util.network.basic.BasicContentMsg;
-import se.sics.ktoolbox.util.network.basic.BasicHeader;
 
 /**
  * @author pradeeppeiris
@@ -60,15 +55,18 @@ public class LeaderFailureObserver extends ComponentDefinition {
     Handler<CheckTimeout> handleCheck = new Handler<CheckTimeout>() {
     	@Override
         public void handle(CheckTimeout event) {
+    		
     		GlobalView gv = config().getValue("simulation.globalview", GlobalView.class);
-    		if(gv.getValue("simulation.leader_selected", Boolean.class) == true) {
-    			LOG.debug("{} is selected as leader", gv.getValue("simulation.leader_id", String.class));
-//    			KAddress leaderNode = gv.getValue("simulation.leader", KAddress.class);
+    		if(gv.getValue("simulation.leader_detected", Boolean.class) == true) {
+    			Set<String> eligibleLeaders = gv.getValue("simulation.eligible_leaders", HashSet.class);
+    			Set<String> detected = gv.getValue("simulation.detected_by", HashSet.class);
     			
-//    			KHeader header = new BasicHeader(leaderNode, leaderNode, Transport.UDP);
-//        		KContentMsg msg = new BasicContentMsg(header, new ShutdownNode());
-//        		trigger(msg, network);
-//    			gv.terminate();
+    			LOG.info("{} is detected at {}", gv.getValue("simulation.leader_id", String.class), detected);
+    			if(detected.containsAll(eligibleLeaders)) {
+    				LOG.info("All eligible leaders detect the leader in  {} rounds", gv.getValue("simulation.leader_detected_cycles", Integer.class));
+    				gv.terminate();
+    			}
+
     		}
     	}    		
     };

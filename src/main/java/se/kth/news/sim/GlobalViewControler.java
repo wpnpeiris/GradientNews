@@ -34,6 +34,10 @@ public class GlobalViewControler {
 		gv.setValue("simulation.leader", null);
     	gv.setValue("simulation.leader_id", "-1");
     	gv.setValue("simulation.leader_selected", false);
+    	gv.setValue("simulation.leader_detected", false);
+    	gv.setValue("simulation.leader_detected_cycles", 0);
+    	gv.setValue("simulation.detected_by", new HashSet<String>());
+    	gv.setValue("simulation.eligible_leaders", new HashSet<String>());
     	
     	gv.setValue("simulation.converge_node_count", 0);
 		gv.setValue("simulation.converge_rounds", new HashMap<String, Integer>());
@@ -53,6 +57,32 @@ public class GlobalViewControler {
 		gv.setValue("simulation.leader_selected", true);
     	gv.setValue("simulation.leader_id", leader.getId().toString());
     	gv.setValue("simulation.leader", leader);
+	}
+	
+	public void updateLeaderDetection(GlobalView gv, String nodeId) {
+		gv.setValue("simulation.leader_detected", true);
+		Set<String> data = gv.getValue("simulation.detected_by", HashSet.class);
+		data.add(nodeId);
+		gv.setValue("simulation.detected_by", data);
+	}
+	
+	public void updateLeaderDetectionCycles(GlobalView gv, String nodeId) {
+		
+		if(gv.getValue("simulation.leader_detected", Boolean.class)){
+			gv.setValue("simulation.leader_detected_cycles", gv.getValue("simulation.leader_detected_cycles", Integer.class) + 1);
+		}
+	}
+	
+	public void updateEligibleLeaders(GlobalView gv, String nodeId) {
+		Set<String> data = gv.getValue("simulation.eligible_leaders", HashSet.class);
+		data.add(nodeId);
+		gv.setValue("simulation.eligible_leaders", data);
+	}
+	
+	public void removeLeaderFromEligibleList(GlobalView gv, String leader) {
+		Set<String> data = gv.getValue("simulation.eligible_leaders", HashSet.class);
+		data.remove(leader);
+		gv.setValue("simulation.eligible_leaders", data);
 	}
 	
 	public void updateGlobalOverlayConvergeView(GlobalView gv, String nodeId) {
