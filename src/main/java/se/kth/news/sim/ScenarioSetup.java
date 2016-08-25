@@ -34,7 +34,6 @@ public class ScenarioSetup {
     public static final long scenarioSeed = 1234;
     public static final int appPort = 12345;
     public static final KAddress bootstrapServer;
-    public static final KAddress observerServer;
     
     public static byte overlayOwner = 0x10;
     public static final Identifier newsOverlayId;
@@ -42,7 +41,6 @@ public class ScenarioSetup {
     static {
         try {
             bootstrapServer = NatAwareAddressImpl.open(new BasicAddress(InetAddress.getByName("193.0.0.1"), appPort, new IntIdentifier(0)));
-            observerServer = NatAwareAddressImpl.open(new BasicAddress(InetAddress.getByName("192.0.0.1"), appPort, new IntIdentifier(0)));
         } catch (UnknownHostException ex) {
             throw new RuntimeException(ex);
         }
@@ -51,7 +49,9 @@ public class ScenarioSetup {
 
     public static KAddress getNodeAdr(int nodeId) {
         try {
-            return NatAwareAddressImpl.open(new BasicAddress(InetAddress.getByName("193.0.0." + nodeId), appPort, new IntIdentifier(nodeId)));
+        	int x = nodeId % 255;
+        	int y = nodeId / 255;
+            return NatAwareAddressImpl.open(new BasicAddress(InetAddress.getByName("193.0." + y + "." + x), appPort, new IntIdentifier(nodeId)));
         } catch (UnknownHostException ex) {
             throw new RuntimeException(ex);
         }

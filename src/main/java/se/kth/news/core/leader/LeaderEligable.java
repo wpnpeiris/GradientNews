@@ -23,7 +23,7 @@ import se.sics.ktoolbox.util.network.KAddress;
 /**
  * @author Alex Ormenisan <aaor@kth.se>
  */
-public class LeaderUpdate implements KompicsEvent {
-    public LeaderUpdate() {
+public class LeaderEligable implements KompicsEvent {
+    public LeaderEligable() {
     }
 }

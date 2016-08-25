@@ -21,24 +21,4 @@ package se.kth.news.play;
  * @author Alex Ormenisan <aaor@kth.se>
  */
 public class Ping {
-	
-	String id;
-
-	public Ping() {
-		
-	}
-	
-	public Ping(String id) {
-		this.id = id;
-	}
-	
-	public String getId() {
-		return id;
-	}
-
-	public void setId(String id) {
-		this.id = id;
-	}
-	
-	
 }

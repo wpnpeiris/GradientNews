@@ -17,11 +17,15 @@
  */
 package se.kth.news.core;
 
-import se.kth.news.core.leader.LeaderSelectComp;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import se.kth.news.core.leader.LeaderEligablePort;
+import se.kth.news.core.leader.LeaderSelectComp;
 import se.kth.news.core.leader.LeaderSelectPort;
-import se.kth.news.core.news.NewsComp;
+import se.kth.news.core.news.CroupierNewsComp;
+import se.kth.news.core.news.GradientNewsComponent;
+import se.kth.news.core.news.data.INewsItemDAO;
 import se.kth.news.core.news.util.NewsViewComparator;
 import se.kth.news.core.news.util.NewsViewGradientFilter;
 import se.sics.kompics.Channel;
@@ -35,7 +39,6 @@ import se.sics.kompics.network.Network;
 import se.sics.kompics.timer.Timer;
 import se.sics.ktoolbox.croupier.CroupierPort;
 import se.sics.ktoolbox.gradient.GradientPort;
-import se.sics.ktoolbox.omngr.bootstrap.BootstrapClientComp;
 import se.sics.ktoolbox.overlaymngr.OverlayMngrPort;
 import se.sics.ktoolbox.overlaymngr.events.OMngrTGradient;
 import se.sics.ktoolbox.util.identifiable.Identifier;
@@ -47,7 +50,7 @@ import se.sics.ktoolbox.util.overlays.view.OverlayViewUpdatePort;
  */
 public class AppMngrComp extends ComponentDefinition {
 
-    private static final Logger LOG = LoggerFactory.getLogger(BootstrapClientComp.class);
+    private static final Logger LOG = LoggerFactory.getLogger(AppMngrComp.class);
     private String logPrefix = "";
     //*****************************CONNECTIONS**********************************
     Positive<OverlayMngrPort> omngrPort = requires(OverlayMngrPort.class);
@@ -55,7 +58,8 @@ public class AppMngrComp extends ComponentDefinition {
     private ExtPort extPorts;
     private KAddress selfAdr;
     private Identifier gradientOId;
-    private boolean newsFloodLeader;
+    private INewsItemDAO newItemDAO;
+    private int networkType;
     //***************************INTERNAL_STATE*********************************
     private Component leaderSelectComp;
     private Component newsComp;
@@ -70,7 +74,8 @@ public class AppMngrComp extends ComponentDefinition {
 
         extPorts = init.extPorts;
         gradientOId = init.gradientOId;
-        newsFloodLeader = init.newsFloodLeader;
+        newItemDAO = init.newItemDAO;
+        networkType = init.networkType;
 
         subscribe(handleStart, control);
         subscribe(handleGradientConnected, omngrPort);
@@ -93,25 +98,35 @@ public class AppMngrComp extends ComponentDefinition {
             LOG.info("{}overlays connected", logPrefix);
             connectLeaderSelect();
             connectNews();
+            
             trigger(Start.event, leaderSelectComp.control());
             trigger(Start.event, newsComp.control());
         }
     };
 
     private void connectLeaderSelect() {
-        leaderSelectComp = create(LeaderSelectComp.class, new LeaderSelectComp.Init(selfAdr, new NewsViewComparator()));
+        leaderSelectComp = create(LeaderSelectComp.class, new LeaderSelectComp.Init(selfAdr, new NewsViewComparator(), newItemDAO));
         connect(leaderSelectComp.getNegative(Timer.class), extPorts.timerPort, Channel.TWO_WAY);
         connect(leaderSelectComp.getNegative(Network.class), extPorts.networkPort, Channel.TWO_WAY);
         connect(leaderSelectComp.getNegative(GradientPort.class), extPorts.gradientPort, Channel.TWO_WAY);
     }
 
     private void connectNews() {
-        newsComp = create(NewsComp.class, new NewsComp.Init(selfAdr, gradientOId, newsFloodLeader));
+    	switch(networkType) {
+    	case NewsComponentType.CROUPIER_NETWORK:
+    		newsComp = create(CroupierNewsComp.class, new CroupierNewsComp.Init(selfAdr, gradientOId, newItemDAO));
+    		break;
+    	case NewsComponentType.GRADIENT_NETWORK:
+    		newsComp = create(GradientNewsComponent.class, new GradientNewsComponent.Init(selfAdr, gradientOId, newItemDAO));
+    		break;
+    	}
+    	
         connect(newsComp.getNegative(Timer.class), extPorts.timerPort, Channel.TWO_WAY);
         connect(newsComp.getNegative(Network.class), extPorts.networkPort, Channel.TWO_WAY);
         connect(newsComp.getNegative(CroupierPort.class), extPorts.croupierPort, Channel.TWO_WAY);
         connect(newsComp.getNegative(GradientPort.class), extPorts.gradientPort, Channel.TWO_WAY);
         connect(newsComp.getNegative(LeaderSelectPort.class), leaderSelectComp.getPositive(LeaderSelectPort.class), Channel.TWO_WAY);
+        connect(newsComp.getNegative(LeaderEligablePort.class), leaderSelectComp.getPositive(LeaderEligablePort.class), Channel.TWO_WAY);
         connect(newsComp.getPositive(OverlayViewUpdatePort.class), extPorts.viewUpdatePort, Channel.TWO_WAY);
     }
 
@@ -120,13 +135,15 @@ public class AppMngrComp extends ComponentDefinition {
         public final ExtPort extPorts;
         public final KAddress selfAdr;
         public final Identifier gradientOId;
-        public final boolean newsFloodLeader;
+        public final INewsItemDAO newItemDAO;
+        public final int networkType;
 
-        public Init(ExtPort extPorts, KAddress selfAdr, Identifier gradientOId, boolean newsFloodLeader) {
+        public Init(ExtPort extPorts, KAddress selfAdr, Identifier gradientOId, INewsItemDAO newItemDAO, int networkType) {
             this.extPorts = extPorts;
             this.selfAdr = selfAdr;
             this.gradientOId = gradientOId;
-            this.newsFloodLeader = newsFloodLeader;
+            this.newItemDAO = newItemDAO;
+            this.networkType = networkType;
         }
     }
 

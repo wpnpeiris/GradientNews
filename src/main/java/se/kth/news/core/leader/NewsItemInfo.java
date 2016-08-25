@@ -17,13 +17,17 @@
  */
 package se.kth.news.core.leader;
 
-import se.sics.kompics.KompicsEvent;
-import se.sics.ktoolbox.util.network.KAddress;
+import java.util.List;
+
+import se.kth.news.core.news.data.NewsItem;
 
 /**
  * @author Alex Ormenisan <aaor@kth.se>
  */
-public class LeaderUpdate implements KompicsEvent {
-    public LeaderUpdate() {
+public class NewsItemInfo {
+    public final List<NewsItem> news;
+    
+    public NewsItemInfo(List<NewsItem> news) {
+        this.news = news;
     }
 }

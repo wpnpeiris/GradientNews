@@ -17,13 +17,13 @@
  */
 package se.kth.news.core.leader;
 
-import se.sics.kompics.KompicsEvent;
-import se.sics.ktoolbox.util.network.KAddress;
+import se.sics.kompics.PortType;
 
 /**
  * @author Alex Ormenisan <aaor@kth.se>
  */
-public class LeaderUpdate implements KompicsEvent {
-    public LeaderUpdate() {
+public class LeaderEligablePort extends PortType {
+    {
+        indication(LeaderEligable.class);
     }
 }

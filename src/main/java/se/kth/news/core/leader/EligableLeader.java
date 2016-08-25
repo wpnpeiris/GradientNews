@@ -17,13 +17,15 @@
  */
 package se.kth.news.core.leader;
 
-import se.sics.kompics.KompicsEvent;
 import se.sics.ktoolbox.util.network.KAddress;
 
 /**
  * @author Alex Ormenisan <aaor@kth.se>
  */
-public class LeaderUpdate implements KompicsEvent {
-    public LeaderUpdate() {
+public class EligableLeader {
+    public final KAddress eligableLeaderAdr;
+    
+    public EligableLeader(KAddress leaderAdr) {
+        this.eligableLeaderAdr = leaderAdr;
     }
 }
