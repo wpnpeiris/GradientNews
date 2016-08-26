@@ -1,4 +1,5 @@
-# id2210-vt16
+# id2210-vt16x
+
 
 How to run the simulation from command line:
  
@@ -11,6 +12,8 @@ mvn clean install
 > In order to run from command line you need to specify the location of the log4j.properties file and the config file.
 > 
 > One recurring problem is relative paths not working. Use absolute paths.
+
+
 
 ```sh
 java -Dlog4j.configuration=file:${LOG4J_PROPERTIES_PATH} -Dconfig.file=${CONFIG_FILE_PATH} -jar ${JAR}
